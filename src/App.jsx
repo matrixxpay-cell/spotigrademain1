@@ -2150,7 +2150,7 @@ function StatusPage(){
                     )}
                   </div>
                 </div>
-                <div style={{textAlign:"right",flexShrink:0}}>
+                <div className="uptime-bars" style={{textAlign:"right",flexShrink:0}}>
                   <UptimeBars bars={history[key]}/>
                 </div>
               </div>
@@ -2975,6 +2975,7 @@ export default function App(){
           .admin-mobile-tabs{display:flex!important;}
         }
         .admin-mobile-tabs{display:none;}
+        @media(max-width:700px){.uptime-bars{display:none!important;}}
         @media(max-width:480px){
           .three-col{grid-template-columns:1fr!important;}
           .stat-grid{grid-template-columns:1fr 1fr!important;}
