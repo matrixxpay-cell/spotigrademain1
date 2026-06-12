@@ -1437,6 +1437,8 @@ function saveGenHistory(h){ try{localStorage.setItem(GEN_HISTORY_KEY,JSON.string
 function AdminKeys(){
   const [keys,setKeys]=useState([]);
   const [selected,setSelected]=useState([]);
+  const [search,setSearch]=useState("");
+  const [statusFilter,setStatusFilter]=useState("all");
   const [genCount,setGenCount]=useState("10");
   const [genLoading,setGenLoading]=useState(false);
   const [copied,setCopied]=useState(null);
@@ -1587,6 +1589,24 @@ function AdminKeys(){
         );
       })()}
 
+      {/* Search & Filter */}
+      <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+        <input placeholder="Search by key, email, username..." value={search} onChange={e=>setSearch(e.target.value)}
+          style={{flex:1,minWidth:200,background:"#0F1117",border:"1px solid #2D3748",borderRadius:9,
+            padding:"8px 13px",fontSize:13,color:"#F9FAFB",outline:"none"}}/>
+        <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}
+          style={{background:"#0F1117",border:"1px solid #2D3748",borderRadius:9,padding:"8px 12px",
+            fontSize:13,color:"#F9FAFB",outline:"none",cursor:"pointer"}}>
+          <option value="all">All Statuses</option>
+          <option value="available">Available</option>
+          <option value="processing">Processing</option>
+          <option value="used_upgrade">Used – Upgrade</option>
+          <option value="used_renew">Used – Renew</option>
+          <option value="cooldown">Cooldown</option>
+          <option value="terminated">Terminated</option>
+        </select>
+      </div>
+
       {/* Actions */}
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,flexWrap:"wrap"}}>
         <span style={{fontSize:13,color:"#9CA3AF"}}>{keys.length} total · {selected.length} selected</span>
@@ -1634,10 +1654,15 @@ function AdminKeys(){
             <span key={h} style={{fontSize:10,fontWeight:800,color:"#6B7280",textTransform:"uppercase",letterSpacing:"0.08em"}}>{h}</span>
           ))}
         </div>
-        {keys.length===0&&(
-          <div style={{padding:"40px 0",textAlign:"center",color:"#6B7280",fontSize:14}}>No keys found</div>
-        )}
-        {keys.map(k=>{
+        {(()=>{
+          const q=search.toLowerCase();
+          const visibleKeys=keys.filter(k=>{
+            const matchSearch=!q||(k.key||"").toLowerCase().includes(q)||(k.usedByEmail||"").toLowerCase().includes(q)||(k.usedByUsername||"").toLowerCase().includes(q);
+            const matchStatus=statusFilter==="all"||k.status===statusFilter;
+            return matchSearch&&matchStatus;
+          });
+          if(visibleKeys.length===0)return<div style={{padding:"40px 0",textAlign:"center",color:"#6B7280",fontSize:14}}>{search||statusFilter!=="all"?"No keys match your search.":"No keys found"}</div>;
+          return visibleKeys.map(k=>{
           const isSel=selected.includes(k._id);
           const clLeft=cooldownLeft(k.cooldownUntil);
           const hasCooldown=k.cooldownUntil&&new Date(k.cooldownUntil)>new Date();
@@ -1684,7 +1709,7 @@ function AdminKeys(){
               </div>
             </div>
           );
-        })}
+        });})()}
       </div>
     </div>
   );
@@ -1777,6 +1802,9 @@ function AdminUpgradeDetail({req,onBack,onRefresh,onShowDecline}){
   const [loading,setLoading]=useState(false);
   const [done,setDone]=useState(req.status==="approved");
   const [r,setR]=useState(req);
+  const [makers,setMakers]=useState([]);
+  useEffect(()=>{api.getMakers().then(setMakers).catch(()=>{});},[]);
+  const processorName=(id)=>{if(!id)return null;const m=makers.find(x=>x._id===id);return m?`Maker: ${m.name}`:"Admin";};
 
   const confirmUsername=async()=>{
     if(!username.trim())return;
@@ -1847,6 +1875,21 @@ function AdminUpgradeDetail({req,onBack,onRefresh,onShowDecline}){
               <span style={{fontSize:12,color:"#E5E7EB",fontWeight:600,fontFamily:lbl==="Key"?"monospace":"inherit"}}>{val}</span>
             </div>
           ))}
+          {(r.status==="approved"||r.status==="declined")&&(
+            <div style={{marginTop:10,padding:"10px 12px",borderRadius:10,
+              background:r.status==="approved"?"#064E3B":"#1C0A0A",
+              border:`1px solid ${r.status==="approved"?"#065F46":"#7F1D1D"}`}}>
+              <p style={{margin:"0 0 2px",fontSize:11,fontWeight:700,
+                color:r.status==="approved"?"#6EE7B7":"#FCA5A5",textTransform:"uppercase",letterSpacing:"0.06em"}}>
+                {r.status==="approved"?"✓ Approved by":"✕ Declined by"}
+              </p>
+              <p style={{margin:0,fontSize:13,fontWeight:800,
+                color:r.status==="approved"?"#6EE7B7":"#FCA5A5"}}>
+                {processorName(r.processedBy)||"Admin"}
+              </p>
+              {r.declineReason&&<p style={{margin:"4px 0 0",fontSize:12,color:"#FCA5A5",opacity:0.85}}>Reason: {r.declineReason}</p>}
+            </div>
+          )}
         </div>
 
         {/* Admin Actions */}
@@ -2033,11 +2076,14 @@ function AdminRenewDetail({req,onBack,onRefresh,onShowDecline}){
   const [proofStatus,setProofStatus]=useState(req.proofStatus||null);
   const [loading,setLoading]=useState(false);
   const [done,setDone]=useState(req.status==="approved");
+  const [makers,setMakers]=useState([]);
 
   const [originalUsername,setOriginalUsername]=useState(null);
   useEffect(()=>{
     api.getKey(r.key).then(k=>setOriginalUsername(k?.usedByUsername||null)).catch(()=>{});
+    api.getMakers().then(setMakers).catch(()=>{});
   },[r.key]);
+  const processorName=(id)=>{if(!id)return null;const m=makers.find(x=>x._id===id);return m?`Maker: ${m.name}`:"Admin";};
 
   const checkUsername=async()=>{
     setUsernameError("");
@@ -2123,6 +2169,20 @@ function AdminRenewDetail({req,onBack,onRefresh,onShowDecline}){
             <div style={{marginTop:12,padding:"10px 12px",background:"#1A2035",border:"1px solid #2D3748",borderRadius:10}}>
               <p style={{margin:"0 0 2px",fontSize:10,color:"#6B7280",fontWeight:700,textTransform:"uppercase"}}>Original Upgrade Username</p>
               <p style={{margin:0,fontSize:14,color:"#A78BFA",fontWeight:800}}>@{originalUsername}</p>
+            </div>
+          )}
+          {(r.status==="approved"||r.status==="declined")&&(
+            <div style={{marginTop:10,padding:"10px 12px",borderRadius:10,
+              background:r.status==="approved"?"#064E3B":"#1C0A0A",
+              border:`1px solid ${r.status==="approved"?"#065F46":"#7F1D1D"}`}}>
+              <p style={{margin:"0 0 2px",fontSize:11,fontWeight:700,
+                color:r.status==="approved"?"#6EE7B7":"#FCA5A5",textTransform:"uppercase",letterSpacing:"0.06em"}}>
+                {r.status==="approved"?"✓ Approved by":"✕ Declined by"}
+              </p>
+              <p style={{margin:0,fontSize:13,fontWeight:800,color:r.status==="approved"?"#6EE7B7":"#FCA5A5"}}>
+                {processorName(r.processedBy)||"Admin"}
+              </p>
+              {r.declineReason&&<p style={{margin:"4px 0 0",fontSize:12,color:"#FCA5A5",opacity:0.85}}>Reason: {r.declineReason}</p>}
             </div>
           )}
         </div>
