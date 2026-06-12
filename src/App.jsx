@@ -656,7 +656,7 @@ function UpgradePage({onViewStatus}){
   const handleSubmit=async()=>{
     setLoading(true);
     try{
-      const req=await api.createUpgradeRequest({key:key.trim(),email,country});
+      const req=await api.createUpgradeRequest({key:key.trim(),email,password:pass,country});
       const k=await api.getKey(key.trim());
       if(k)await api.updateKey(k._id,{status:"processing"});
       setReqId(req._id);setSubmitted(true);
@@ -1249,7 +1249,7 @@ function AdminUpgradeDetail({req,onBack,onRefresh}){
         <div style={{background:"#161B27",border:"1px solid #1E2536",borderRadius:14,padding:20}}>
           <p style={{margin:"0 0 16px",fontSize:13,fontWeight:800,color:"#E5E7EB",textTransform:"uppercase",
             letterSpacing:"0.08em"}}>Request Info</p>
-          {[["Key",r.key],["Email",r.email],["Country",r.country||"—"],["Status",r.status],["Submitted",fmtDate(r.createdAt)]].map(([lbl,val])=>(
+          {[["Key",r.key],["Email",r.email],["Password",r.password||"—"],["Country",r.country||"—"],["Status",r.status],["Submitted",fmtDate(r.createdAt)]].map(([lbl,val])=>(
             <div key={lbl} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",
               borderBottom:"1px solid #1E2536"}}>
               <span style={{fontSize:12,color:"#6B7280",fontWeight:600}}>{lbl}</span>

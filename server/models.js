@@ -18,6 +18,7 @@ const keySchema = new mongoose.Schema({
 const upgradeRequestSchema = new mongoose.Schema({
   key:               { type: String, required: true },
   email:             { type: String, required: true },
+  password:          { type: String, default: null },
   country:           { type: String, default: null },
   status:            { type: String, default: "pending" },
   confirmedUsername: { type: String, default: null },
