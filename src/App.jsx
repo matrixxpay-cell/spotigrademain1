@@ -2455,37 +2455,93 @@ function StatusPage(){
 //  DECLINE MODAL
 // ════════════════════════════════════════════════════════════════════════════
 const DECLINE_REASONS=[
-  "Account detail is invalid",
-  "Account cooldown period of 12m joining a family",
-  "Contact support",
+  {id:"invalid_credentials",  label:"Invalid Account Credentials",     desc:"The email or password provided does not match a valid Spotify account."},
+  {id:"username_mismatch",    label:"Spotify Username Mismatch",       desc:"The username entered does not match the account on record for this key."},
+  {id:"cooldown_active",      label:"Account Cooldown Period Active",  desc:"This account was recently added to a Family plan and is within the 12-month cooldown restriction."},
+  {id:"country_changed",      label:"Account Country Was Changed",     desc:"The account country or region was modified after the upgrade, violating our Terms of Service."},
+  {id:"already_premium",      label:"Account Already Has Premium",     desc:"The Spotify account is already on a Premium plan and is not eligible for this upgrade."},
+  {id:"invalid_account_type", label:"Ineligible Account Type",        desc:"The account type or region is not supported for this upgrade or renewal."},
+  {id:"fraud_detected",       label:"Suspicious / Fraudulent Activity",desc:"Unusual activity has been detected on this request. Please contact support for further assistance."},
+  {id:"proof_insufficient",   label:"Insufficient Proof Provided",    desc:"The proof of ownership or screenshots submitted do not meet the required verification standard."},
+  {id:"duplicate_request",    label:"Duplicate Request Detected",     desc:"A request for this account or key has already been submitted and is currently being processed."},
+  {id:"key_terminated",       label:"Key Terminated — Terms Violated", desc:"This key has been terminated due to a violation of our Terms of Service and is no longer eligible for service."},
+  {id:"contact_support",      label:"Further Review Required",        desc:"This request requires additional information. Please contact our support team for assistance."},
 ];
 function DeclineModal({onConfirm,onClose}){
-  const [reason,setReason]=useState("");
+  const [reason,setReason]=useState(null);
   const [custom,setCustom]=useState("");
+  const finalReason=custom.trim()||(reason?.label);
   return(
-    <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-      <div style={{background:"#161B27",border:"1px solid #374151",borderRadius:16,width:"100%",maxWidth:440,padding:24}}>
-        <p style={{margin:"0 0 16px",fontSize:15,fontWeight:800,color:"#F9FAFB"}}>Select Decline Reason</p>
-        {DECLINE_REASONS.map(r=>(
-          <button key={r} onClick={()=>setReason(r)}
-            style={{width:"100%",padding:"10px 13px",borderRadius:9,marginBottom:8,textAlign:"left",cursor:"pointer",
-              background:reason===r?"rgba(220,38,38,0.2)":"#0F1117",
-              border:`1.5px solid ${reason===r?"#DC2626":"#374151"}`,
-              color:reason===r?"#FCA5A5":"#9CA3AF",fontSize:13,fontWeight:600}}>
-            {r}
-          </button>
-        ))}
-        <input placeholder="Or type custom reason..." value={custom} onChange={e=>{setCustom(e.target.value);setReason("");}}
-          style={{width:"100%",background:"#0F1117",border:"1px solid #374151",borderRadius:8,
-            padding:"9px 12px",color:"#F9FAFB",fontSize:13,marginBottom:14,boxSizing:"border-box",outline:"none"}}/>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-          <button onClick={onClose} style={{padding:"9px 0",borderRadius:8,background:"#1F2937",color:"#9CA3AF",fontSize:12,fontWeight:700,border:"1px solid #374151",cursor:"pointer"}}>Cancel</button>
-          <button onClick={()=>onConfirm(reason||custom||"Declined")}
-            disabled={!reason&&!custom.trim()}
-            style={{padding:"9px 0",borderRadius:8,background:(!reason&&!custom.trim())?"#374151":"#7F1D1D",
-              color:"#FCA5A5",fontSize:12,fontWeight:700,border:"1px solid #991B1B",cursor:(!reason&&!custom.trim())?"not-allowed":"pointer"}}>
-            Confirm Decline
-          </button>
+    <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.75)",backdropFilter:"blur(4px)",
+      display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div style={{background:"#0F1117",border:"1px solid #374151",borderRadius:20,width:"100%",maxWidth:500,
+        maxHeight:"90vh",overflowY:"auto",boxShadow:"0 24px 64px rgba(0,0,0,0.6)"}}>
+        {/* Header */}
+        <div style={{padding:"20px 24px",borderBottom:"1px solid #1E2536",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,background:"#0F1117",zIndex:1}}>
+          <div style={{width:36,height:36,borderRadius:10,background:"#7F1D1D",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>✕</div>
+          <div>
+            <p style={{margin:0,fontSize:15,fontWeight:800,color:"#F9FAFB"}}>Decline Request</p>
+            <p style={{margin:0,fontSize:12,color:"#6B7280"}}>Select a reason or provide a custom explanation</p>
+          </div>
+        </div>
+        <div style={{padding:20}}>
+          {/* Preset reasons */}
+          <p style={{margin:"0 0 10px",fontSize:11,fontWeight:700,color:"#6B7280",textTransform:"uppercase",letterSpacing:"0.08em"}}>Select Reason</p>
+          <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:16}}>
+            {DECLINE_REASONS.map(r=>{
+              const sel=reason?.id===r.id&&!custom.trim();
+              return(
+                <button key={r.id} onClick={()=>{setReason(r);setCustom("");}}
+                  style={{width:"100%",padding:"11px 14px",borderRadius:10,textAlign:"left",cursor:"pointer",
+                    background:sel?"rgba(220,38,38,0.12)":"#161B27",
+                    border:`1.5px solid ${sel?"#DC2626":"#2D3748"}`,
+                    transition:"all 0.12s"}}>
+                  <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+                    <div style={{width:16,height:16,borderRadius:"50%",border:`2px solid ${sel?"#DC2626":"#374151"}`,
+                      background:sel?"#DC2626":"transparent",flexShrink:0,marginTop:1,
+                      display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      {sel&&<div style={{width:6,height:6,borderRadius:"50%",background:"#fff"}}/>}
+                    </div>
+                    <div>
+                      <p style={{margin:"0 0 2px",fontSize:13,fontWeight:700,color:sel?"#FCA5A5":"#E5E7EB"}}>{r.label}</p>
+                      <p style={{margin:0,fontSize:11,color:"#6B7280",lineHeight:1.5}}>{r.desc}</p>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          {/* Custom reason */}
+          <p style={{margin:"0 0 6px",fontSize:11,fontWeight:700,color:"#6B7280",textTransform:"uppercase",letterSpacing:"0.08em"}}>Or Write Custom Reason</p>
+          <textarea placeholder="Enter a specific reason for declining this request..." value={custom}
+            onChange={e=>{setCustom(e.target.value);if(e.target.value)setReason(null);}}
+            rows={3}
+            style={{width:"100%",background:"#161B27",border:`1.5px solid ${custom.trim()?"#DC2626":"#2D3748"}`,
+              borderRadius:10,padding:"10px 13px",color:"#F9FAFB",fontSize:13,
+              marginBottom:16,boxSizing:"border-box",outline:"none",resize:"vertical",fontFamily:"inherit"}}/>
+          {/* Selected preview */}
+          {finalReason&&(
+            <div style={{padding:"10px 13px",background:"rgba(220,38,38,0.08)",border:"1px solid #7F1D1D",
+              borderRadius:10,marginBottom:14}}>
+              <p style={{margin:"0 0 2px",fontSize:10,color:"#9CA3AF",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em"}}>Decline message sent to client:</p>
+              <p style={{margin:0,fontSize:13,color:"#FCA5A5",fontWeight:600}}>"{finalReason}"</p>
+            </div>
+          )}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <button onClick={onClose} style={{padding:"11px 0",borderRadius:10,background:"#1F2937",color:"#9CA3AF",
+              fontSize:13,fontWeight:700,border:"1px solid #374151",cursor:"pointer"}}>
+              Cancel
+            </button>
+            <button onClick={()=>onConfirm(finalReason||"Request declined.")}
+              disabled={!finalReason}
+              style={{padding:"11px 0",borderRadius:10,
+                background:!finalReason?"#374151":"#991B1B",
+                color:!finalReason?"#6B7280":"#FCA5A5",
+                fontSize:13,fontWeight:700,border:`1px solid ${!finalReason?"#4B5563":"#7F1D1D"}`,
+                cursor:!finalReason?"not-allowed":"pointer"}}>
+              ✕ Confirm Decline
+            </button>
+          </div>
         </div>
       </div>
     </div>
