@@ -2518,8 +2518,8 @@ function MakerRenewDetail({req,maker,onBack,onDecline,onApproved}){
 // ════════════════════════════════════════════════════════════════════════════
 export default function App(){
   const [page,setPage]=useState("upgrade");
-  const [isAdmin,setIsAdmin]=useState(false);
-  const [maker,setMaker]=useState(null);
+  const [isAdmin,setIsAdmin]=useState(()=>localStorage.getItem("role")==="admin");
+  const [maker,setMaker]=useState(()=>{try{const m=localStorage.getItem("maker");return m?JSON.parse(m):null;}catch{return null;}});
   const [keyInfoPrefill,setKeyInfoPrefill]=useState("");
   const [renewPrefill,setRenewPrefill]=useState("");
 
@@ -2527,8 +2527,13 @@ export default function App(){
   const goToRenew=k=>{setRenewPrefill(k);setPage("renew");};
   const navTo=id=>{if(id!=="keyinfo")setKeyInfoPrefill("");if(id!=="renew")setRenewPrefill("");setPage(id);};
 
-  if(isAdmin)return <AdminPanel onLogout={()=>setIsAdmin(false)}/>;
-  if(maker)return <MakerPanel maker={maker} onLogout={()=>setMaker(null)}/>;
+  const loginAdmin=()=>{localStorage.setItem("role","admin");setIsAdmin(true);};
+  const loginMaker=m=>{localStorage.setItem("maker",JSON.stringify(m));setMaker(m);};
+  const logoutAdmin=()=>{localStorage.removeItem("role");setIsAdmin(false);};
+  const logoutMaker=()=>{localStorage.removeItem("maker");setMaker(null);};
+
+  if(isAdmin)return <AdminPanel onLogout={logoutAdmin}/>;
+  if(maker)return <MakerPanel maker={maker} onLogout={logoutMaker}/>;
 
   return(
     <div style={{minHeight:"100vh",background:C.bg,fontFamily:"Inter,-apple-system,sans-serif"}}>
@@ -2571,7 +2576,7 @@ export default function App(){
       </nav>
 
       <main>
-        {page==="upgrade"&&<UpgradePage onViewStatus={goToKeyInfo} onAdminLogin={()=>setIsAdmin(true)} onMakerLogin={m=>setMaker(m)}/>}
+        {page==="upgrade"&&<UpgradePage onViewStatus={goToKeyInfo} onAdminLogin={loginAdmin} onMakerLogin={loginMaker}/>}
         {page==="renew"&&<RenewPage onViewStatus={goToKeyInfo} prefillKey={renewPrefill} key={renewPrefill}/>}
         {page==="keyinfo"&&<KeyInfoPage prefillKey={keyInfoPrefill} key={keyInfoPrefill} onRenew={goToRenew}/>}
         {page==="status"&&<StatusPage/>}
