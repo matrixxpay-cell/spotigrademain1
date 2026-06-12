@@ -23,11 +23,37 @@ function randomName() {
 }
 
 bot.on("message", async (msg) => {
-  if (!msg.text) return;
-
   const chatId    = String(msg.chat.id);
-  const text      = msg.text;
+  const text      = msg.text || "";
   const firstName = msg.from.first_name || "User";
+
+  // Forward media from clients to agent
+  if (chatId !== String(AGENT_ID) && !text) {
+    if (!sessions[chatId]) {
+      const agentName = randomName();
+      sessions[chatId] = { agentName, firstName };
+      await bot.sendMessage(chatId,
+        `✅ You are now connected with *${agentName}*\n\n_Please wait — our agent will respond shortly._`,
+        { parse_mode: "Markdown" }
+      );
+    }
+    const caption = `📎 *${firstName}* (ID: \`${chatId}\`)`;
+    if (msg.photo) {
+      const fileId = msg.photo[msg.photo.length - 1].file_id;
+      bot.sendPhoto(AGENT_ID, fileId, { caption, parse_mode: "Markdown" });
+    } else if (msg.video) {
+      bot.sendVideo(AGENT_ID, msg.video.file_id, { caption, parse_mode: "Markdown" });
+    } else if (msg.document) {
+      bot.sendDocument(AGENT_ID, msg.document.file_id, { caption, parse_mode: "Markdown" });
+    } else if (msg.voice) {
+      bot.sendVoice(AGENT_ID, msg.voice.file_id, { caption, parse_mode: "Markdown" });
+    } else if (msg.sticker) {
+      bot.sendMessage(AGENT_ID, `${caption}\n[Sticker]`, { parse_mode: "Markdown" });
+    }
+    return;
+  }
+
+  if (!text) return;
 
   console.log(`MSG from ${chatId}: ${text}`);
 
