@@ -15,7 +15,7 @@ const C = {
 };
 
 // ─── API CLIENT (Express + MongoDB backend) ───────────────────────────────────
-const API = "http://45.13.239.204:3001/api";
+const API = "/api";
 
 const api = {
   // KEYS

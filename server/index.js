@@ -2,6 +2,7 @@ require("dotenv").config();
 const express  = require("express");
 const mongoose = require("mongoose");
 const cors     = require("cors");
+const path     = require("path");
 const { Key, UpgradeRequest, RenewRequest } = require("./models");
 
 const app  = express();
@@ -9,6 +10,10 @@ const PORT = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(express.json());
+
+// ── Serve React frontend ─────────────────────────────────────────────────────
+const DIST = path.join(__dirname, "../dist");
+app.use(express.static(DIST));
 
 // ── DB connect ───────────────────────────────────────────────────────────────
 mongoose.connect(process.env.MONGO_URI)
@@ -130,6 +135,11 @@ app.patch("/api/renew-requests/:id", async (req, res) => {
 
 // ── Health / Status ───────────────────────────────────────────────────────────
 app.get("/api/health", (req, res) => res.json({ ok: true }));
+
+// ── Catch-all: serve React for any non-API route ─────────────────────────────
+app.get("*", (req, res) => {
+  res.sendFile(path.join(DIST, "index.html"));
+});
 
 app.get("/api/status", async (req, res) => {
   const start = Date.now();
