@@ -3156,6 +3156,125 @@ function MakerRenewDetail({req,maker,onBack,onDecline,onApproved}){
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+//  TERMS OF SERVICE PAGE
+// ════════════════════════════════════════════════════════════════════════════
+function TermsPage(){
+  const Section=({num,title,children})=>(
+    <div style={{marginBottom:32}}>
+      <h2 style={{fontSize:16,fontWeight:800,color:C.text,margin:"0 0 10px",display:"flex",alignItems:"center",gap:10}}>
+        <span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:28,height:28,
+          borderRadius:8,background:C.violetLight,color:C.violet,fontSize:12,fontWeight:900,flexShrink:0}}>{num}</span>
+        {title}
+      </h2>
+      <div style={{fontSize:14,color:C.textSub,lineHeight:1.8,paddingLeft:38}}>{children}</div>
+    </div>
+  );
+  const Li=({children})=>(
+    <div style={{display:"flex",gap:8,marginBottom:6}}>
+      <span style={{color:C.violet,fontWeight:700,flexShrink:0,marginTop:1}}>•</span>
+      <span>{children}</span>
+    </div>
+  );
+  return(
+    <div style={{maxWidth:760,margin:"0 auto",padding:"32px 16px 48px"}}>
+      {/* Header */}
+      <div style={{marginBottom:32}}>
+        <span style={{display:"inline-flex",alignItems:"center",gap:6,padding:"4px 12px",borderRadius:999,
+          background:C.blueLight,color:C.blue,fontSize:11,fontWeight:700,
+          border:`1px solid ${C.blueBorder}`,marginBottom:14}}>
+          Legal Document
+        </span>
+        <h1 style={{fontSize:28,fontWeight:900,color:C.text,margin:"0 0 8px",letterSpacing:"-0.03em"}}>Terms of Service</h1>
+        <p style={{margin:0,fontSize:13,color:C.textMuted,fontWeight:500}}>SpotiGrader.cc &nbsp;·&nbsp; Last Updated: June 2026</p>
+      </div>
+
+      <div style={{background:C.amberLight,border:`1px solid ${C.amberBorder}`,borderRadius:14,padding:"16px 20px",marginBottom:32}}>
+        <p style={{margin:0,fontSize:13,color:C.amberText,lineHeight:1.7}}>
+          By using the services provided by SpotiGrader.cc, you agree to the following Terms of Service.
+          If you do not agree with any part of these terms, please refrain from using our services.
+        </p>
+      </div>
+
+      <Section num="1" title="Service Description">
+        <p style={{margin:0}}>SpotiGrader.cc provides Spotify account upgrade and renewal services. We do not sell Spotify accounts. Users are responsible for providing access to eligible Spotify accounts for upgrade or renewal.</p>
+      </Section>
+
+      <Section num="2" title="Account Requirements">
+        <Li>Customers must provide accurate account information when submitting an upgrade or renewal request.</Li>
+        <Li>For renewal requests, the username of the existing Spotify account must match the username entered in the Renew section.</Li>
+        <Li>Failure to provide correct account information may result in delays, failed renewals, or denial of support.</Li>
+      </Section>
+
+      <Section num="3" title="Lifetime Keys">
+        <Li>Lifetime keys are issued for account upgrades and renewals.</Li>
+        <Li>A lifetime key may be used multiple times for eligible renewals and upgrades unless otherwise specified.</Li>
+        <Li>Lifetime keys remain valid only while complying with these Terms of Service.</Li>
+        <Li>SpotiGrader.cc reserves the right to revoke or terminate a key if misuse, abuse, fraud, or violations of these terms are detected.</Li>
+      </Section>
+
+      <Section num="4" title="Country Changes">
+        <Li>Users may change their Spotify account country after an upgrade or renewal.</Li>
+        <Li>However, changing the account country, billing region, or account location may cause the loss of Premium benefits or service interruption.</Li>
+        <Li>Any Premium loss, downgrade, or account issue resulting from a country change is the sole responsibility of the account owner.</Li>
+        <Li>If a country change causes service disruption, SpotiGrader.cc may terminate the associated lifetime key without compensation or replacement.</Li>
+      </Section>
+
+      <Section num="5" title="Support Policy">
+        <Li>Support is provided only for issues directly related to the upgrade or renewal process.</Li>
+        <Li>Users must cooperate with support staff and provide requested information when troubleshooting issues.</Li>
+        <Li>Support may be denied for accounts that have been modified in ways that affect service eligibility.</Li>
+      </Section>
+
+      <Section num="6" title="Prohibited Activities">
+        <p style={{margin:"0 0 10px"}}>Users may not:</p>
+        <Li>Abuse, exploit, or attempt to bypass service limitations.</Li>
+        <Li>Share, resell, transfer, or distribute lifetime keys without authorization.</Li>
+        <Li>Use the service for fraudulent or unlawful activities.</Li>
+        <Li>Attempt to interfere with the operation of the service or related systems.</Li>
+      </Section>
+
+      <Section num="7" title="Service Availability">
+        <Li>Service availability depends on Spotify and other third-party systems beyond our control.</Li>
+        <Li>SpotiGrader.cc does not guarantee uninterrupted service availability.</Li>
+        <Li>Features, eligibility requirements, and supported account types may change without notice.</Li>
+      </Section>
+
+      <Section num="8" title="Limitation of Liability">
+        <p style={{margin:"0 0 10px"}}>SpotiGrader.cc shall not be held liable for:</p>
+        <Li>Loss of Spotify Premium status.</Li>
+        <Li>Account restrictions, suspensions, or actions taken by Spotify.</Li>
+        <Li>Issues arising from user-initiated country or region changes.</Li>
+        <Li>Service interruptions caused by third-party providers.</Li>
+        <Li>Losses resulting from incorrect information submitted by the user.</Li>
+      </Section>
+
+      <Section num="9" title="Termination">
+        <p style={{margin:"0 0 10px"}}>SpotiGrader.cc reserves the right to suspend or terminate any lifetime key, service access, or support privileges if:</p>
+        <Li>These Terms of Service are violated.</Li>
+        <Li>Fraudulent activity is detected.</Li>
+        <Li>Abuse of the service or support system occurs.</Li>
+      </Section>
+
+      <Section num="10" title="Changes to Terms">
+        <p style={{margin:0}}>These Terms of Service may be updated at any time. Continued use of the service after changes are published constitutes acceptance of the revised terms.</p>
+      </Section>
+
+      <Section num="11" title="Contact">
+        <p style={{margin:0}}>For questions regarding these Terms of Service, please contact our support team through the official support channels listed on SpotiGrader.cc.</p>
+      </Section>
+
+      {/* Important Notice box */}
+      <div style={{background:C.redLight,border:`1px solid ${C.redBorder}`,borderRadius:14,padding:"20px 24px",marginTop:8}}>
+        <p style={{margin:"0 0 12px",fontSize:13,fontWeight:800,color:C.redText,textTransform:"uppercase",letterSpacing:"0.06em"}}>⚠ Important Notice</p>
+        <Li><span style={{color:C.redText}}>The Spotify username entered for renewal must match the existing account username.</span></Li>
+        <Li><span style={{color:C.redText}}>Lifetime keys may be used multiple times unless revoked for violations of these Terms.</span></Li>
+        <Li><span style={{color:C.redText}}>Changing the Spotify account country after an upgrade or renewal may result in Premium loss and <strong>termination of the associated lifetime key</strong>.</span></Li>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 //  ROOT APP
 // ════════════════════════════════════════════════════════════════════════════
 export default function App(){
@@ -3268,6 +3387,7 @@ export default function App(){
         {page==="renew"&&<RenewPage onViewStatus={goToKeyInfo} prefillKey={renewPrefill} key={renewPrefill}/>}
         {page==="keyinfo"&&<KeyInfoPage prefillKey={keyInfoPrefill} key={keyInfoPrefill} onRenew={goToRenew}/>}
         {page==="status"&&<StatusPage/>}
+        {page==="terms"&&<TermsPage/>}
       </main>
 
       <footer style={{borderTop:`1px solid ${C.border}`,marginTop:20,paddingBottom:"env(safe-area-inset-bottom)"}} className="site-footer">
@@ -3282,6 +3402,11 @@ export default function App(){
           </div>
           <div style={{display:"flex",alignItems:"center",gap:14,fontSize:11,color:C.textMuted,fontWeight:600,flexWrap:"wrap"}}>
             <span>No logs kept</span><span>·</span><span>Encrypted</span><span>·</span><span>Lifetime guarantee</span>
+            <span>·</span>
+            <button onClick={()=>setPage("terms")}
+              style={{background:"none",border:"none",cursor:"pointer",color:C.violet,fontSize:11,fontWeight:700,padding:0,textDecoration:"underline"}}>
+              Terms of Service
+            </button>
             <span>·</span>
             <a href="https://t.me/spotigradersupportbot" target="_blank" rel="noopener noreferrer"
               style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 11px",borderRadius:999,
