@@ -1,5 +1,7 @@
 require("dotenv").config();
 const TelegramBot = require("node-telegram-bot-api");
+const fs   = require("fs");
+const path = require("path");
 
 const TOKEN    = process.env.TELEGRAM_BOT_TOKEN;
 const AGENT_ID = process.env.TELEGRAM_AGENT_ID;
@@ -16,7 +18,16 @@ const US_NAMES = [
   "Ashley Anderson","Matthew Taylor","Jessica Thomas","Daniel Harris","Ryan Clark",
 ];
 
-const sessions = {}; // clientId -> { agentName, firstName }
+const SESSIONS_FILE = path.join(__dirname, "bot-sessions.json");
+
+function loadSessions() {
+  try { return JSON.parse(fs.readFileSync(SESSIONS_FILE, "utf8")); } catch { return {}; }
+}
+function saveSessions(s) {
+  try { fs.writeFileSync(SESSIONS_FILE, JSON.stringify(s, null, 2)); } catch {}
+}
+
+const sessions = loadSessions();
 
 function randomName() {
   return US_NAMES[Math.floor(Math.random() * US_NAMES.length)];
@@ -32,6 +43,7 @@ bot.on("message", async (msg) => {
     if (!sessions[chatId]) {
       const agentName = randomName();
       sessions[chatId] = { agentName, firstName };
+      saveSessions(sessions);
       await bot.sendMessage(chatId,
         `✅ You are now connected with *${agentName}*\n\n_Please wait — our agent will respond shortly._`,
         { parse_mode: "Markdown" }
@@ -78,6 +90,7 @@ bot.on("message", async (msg) => {
     if (text.startsWith("/close ")) {
       const targetId = text.split(" ")[1];
       delete sessions[targetId];
+      saveSessions(sessions);
       bot.sendMessage(targetId,
         "✅ Your support session has been closed. Thank you for contacting *SpotiGrader.cc*! Feel free to message us again anytime.",
         { parse_mode: "Markdown" }
@@ -109,6 +122,7 @@ bot.on("message", async (msg) => {
   if (!sessions[chatId]) {
     const agentName = randomName();
     sessions[chatId] = { agentName, firstName };
+    saveSessions(sessions);
     await bot.sendMessage(chatId,
       `✅ You are now connected with *${agentName}*\n\n_Please wait — our agent will respond shortly._`,
       { parse_mode: "Markdown" }
