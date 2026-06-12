@@ -136,11 +136,6 @@ app.patch("/api/renew-requests/:id", async (req, res) => {
 // ── Health / Status ───────────────────────────────────────────────────────────
 app.get("/api/health", (req, res) => res.json({ ok: true }));
 
-// ── Catch-all: serve React for any non-API route ─────────────────────────────
-app.get("*", (req, res) => {
-  res.sendFile(path.join(DIST, "index.html"));
-});
-
 app.get("/api/status", async (req, res) => {
   const start = Date.now();
 
@@ -179,6 +174,11 @@ app.get("/api/status", async (req, res) => {
     stats,
     timestamp: new Date().toISOString(),
   });
+});
+
+// ── Catch-all: serve React for any non-API route ─────────────────────────────
+app.get("*", (req, res) => {
+  res.sendFile(path.join(DIST, "index.html"));
 });
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
