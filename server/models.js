@@ -13,6 +13,7 @@ const keySchema = new mongoose.Schema({
   purchaseDate:    { type: Date, default: Date.now },
   usedDate:        { type: Date, default: null },
   cooldownUntil:   { type: Date, default: null },
+  adminNote:       { type: String, default: null },
 }, { timestamps: true });
 
 const upgradeRequestSchema = new mongoose.Schema({

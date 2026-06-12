@@ -72,6 +72,7 @@ function Badge({status}){
     used_renew:  {bg:"#F5F3FF",color:"#4C1D95",dot:"#7C3AED",label:"Used – Renew"},
     cooldown:    {bg:"#FFFBEB",color:"#92400E",dot:"#D97706",label:"Cooldown"},
     expired:     {bg:"#FEF2F2",color:"#991B1B",dot:"#DC2626",label:"Expired"},
+    terminated:  {bg:"#1C0A0A",color:"#FCA5A5",dot:"#DC2626",label:"Terminated"},
     pending:     {bg:"#FFFBEB",color:"#92400E",dot:"#D97706",label:"Pending"},
     approved:    {bg:"#ECFDF5",color:"#065F46",dot:"#059669",label:"Approved"},
     declined:    {bg:"#FEF2F2",color:"#991B1B",dot:"#DC2626",label:"Declined"},
@@ -732,6 +733,46 @@ function ProcessingScreen({type,keyStr,onViewStatus,onBack}){
 // ════════════════════════════════════════════════════════════════════════════
 //  UPGRADE PAGE
 // ════════════════════════════════════════════════════════════════════════════
+function DisclaimerModal({onConfirm,onCancel}){
+  const [checked,setChecked]=useState(false);
+  return(
+    <div style={{position:"fixed",inset:0,zIndex:9000,background:"rgba(12,14,20,0.65)",backdropFilter:"blur(4px)",
+      display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div style={{background:C.surface,borderRadius:20,border:`1px solid ${C.border}`,
+        boxShadow:"0 24px 64px rgba(0,0,0,0.18)",width:"100%",maxWidth:480}}>
+        <div style={{padding:"20px 24px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:12}}>
+          <div style={{width:36,height:36,borderRadius:10,background:C.amberLight,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>⚠️</div>
+          <h3 style={{margin:0,fontSize:16,fontWeight:800,color:C.text}}>Important Notice</h3>
+        </div>
+        <div style={{padding:24}}>
+          <p style={{margin:"0 0 16px",fontSize:14,fontWeight:700,color:C.text,lineHeight:1.6}}>
+            Please read carefully before proceeding:
+          </p>
+          <div style={{background:C.amberLight,border:`1px solid ${C.amberBorder}`,borderRadius:12,padding:16,marginBottom:16}}>
+            <p style={{margin:"0 0 10px",fontSize:13,color:C.amberText,lineHeight:1.7}}>
+              <strong>Account Region Notice:</strong> To fulfil your upgrade, we may assign your account to an available country region from our current inventory. This is required to activate Spotify Premium on your account.
+            </p>
+            <p style={{margin:0,fontSize:13,color:C.amberText,lineHeight:1.7}}>
+              <strong>⚠ Do not change your account country</strong> after the upgrade has been applied. Modifying the account region post-upgrade will be treated as a violation of the service terms and <strong>will result in immediate key termination</strong> without eligibility for a replacement or refund.
+            </p>
+          </div>
+          <label style={{display:"flex",alignItems:"flex-start",gap:10,cursor:"pointer",marginBottom:20}}>
+            <input type="checkbox" checked={checked} onChange={e=>setChecked(e.target.checked)}
+              style={{marginTop:2,width:15,height:15,cursor:"pointer",accentColor:C.violet,flexShrink:0}}/>
+            <span style={{fontSize:13,color:C.textSub,lineHeight:1.6}}>
+              I have read and understood the above. I agree not to change my account country after the upgrade is applied.
+            </span>
+          </label>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <Btn variant="secondary" size="lg" onClick={onCancel}>Cancel</Btn>
+            <Btn variant="primary" size="lg" onClick={onConfirm} disabled={!checked}>I Agree & Continue</Btn>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function UpgradePage({onViewStatus,onAdminLogin,onMakerLogin}){
   const [step,setStep]=useState(0);
   const [key,setKey]=useState("");
@@ -742,6 +783,7 @@ function UpgradePage({onViewStatus,onAdminLogin,onMakerLogin}){
   const [submitted,setSubmitted]=useState(false);
   const [reqId,setReqId]=useState(null);
   const [keyErr,setKeyErr]=useState("");
+  const [showDisclaimer,setShowDisclaimer]=useState(false);
 
   const validateKey=async()=>{
     setKeyErr("");setLoading(true);
@@ -782,6 +824,7 @@ function UpgradePage({onViewStatus,onAdminLogin,onMakerLogin}){
   const labels=["License Key","Account","Country"];
   return(
     <div style={{maxWidth:540,margin:"0 auto",padding:"32px 16px"}}>
+      {showDisclaimer&&<DisclaimerModal onConfirm={()=>{setShowDisclaimer(false);handleSubmit();}} onCancel={()=>setShowDisclaimer(false)}/>}
       <span style={{display:"inline-flex",alignItems:"center",gap:6,padding:"4px 12px",borderRadius:999,
         background:C.violetLight,color:C.violet,fontSize:11,fontWeight:700,
         border:`1px solid ${C.violet}30`,marginBottom:14}}>
@@ -840,7 +883,7 @@ function UpgradePage({onViewStatus,onAdminLogin,onMakerLogin}){
             <CountrySelect value={country} onChange={setCountry}/>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
               <Btn variant="secondary" size="lg" onClick={()=>setStep(1)}>← Back</Btn>
-              <Btn variant="primary" size="lg" onClick={handleSubmit} disabled={!country} loading={loading}>⚡ Submit Upgrade</Btn>
+              <Btn variant="primary" size="lg" onClick={()=>setShowDisclaimer(true)} disabled={!country}>⚡ Submit Upgrade</Btn>
             </div>
           </div>
         )}
@@ -868,6 +911,7 @@ function RenewPage({onViewStatus,prefillKey=""}){
   const [oldEmail,setOldEmail]=useState("");
   const [oldPass,setOldPass]=useState("");
   const [showModal,setShowModal]=useState(false);
+  const [showDisclaimer,setShowDisclaimer]=useState(false);
   const [linkedUsername,setLinkedUsername]=useState("");
   const [newEmail,setNewEmail]=useState("");
   const [newPass,setNewPass]=useState("");
@@ -920,6 +964,7 @@ function RenewPage({onViewStatus,prefillKey=""}){
 
   return(
     <div style={{maxWidth:540,margin:"0 auto",padding:"32px 16px"}}>
+      {showDisclaimer&&<DisclaimerModal onConfirm={()=>{setShowDisclaimer(false);handleSubmit();}} onCancel={()=>setShowDisclaimer(false)}/>}
       {showModal&&(
         <Modal title="Confirm Your Account" onClose={()=>setShowModal(false)} width={420}>
           <div style={{textAlign:"center"}}>
@@ -1045,7 +1090,7 @@ function RenewPage({onViewStatus,prefillKey=""}){
             <CountrySelect value={country} onChange={setCountry} accentColor={C.green}/>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
               <Btn variant="secondary" size="lg" onClick={()=>setStep(4)}>← Back</Btn>
-              <Btn variant="success" size="lg" onClick={handleSubmit} disabled={!country} loading={loading}>🔄 Submit Renewal</Btn>
+              <Btn variant="success" size="lg" onClick={()=>setShowDisclaimer(true)} disabled={!country}>🔄 Submit Renewal</Btn>
             </div>
           </div>
         )}
@@ -1184,6 +1229,9 @@ function AdminKeyDetail({keyObj,onBack}){
   const [renewReqs,setRenewReqs]=useState([]);
   const [makers,setMakers]=useState([]);
   const [loading,setLoading]=useState(true);
+  const [showTerminate,setShowTerminate]=useState(false);
+  const [terminateNote,setTerminateNote]=useState("");
+  const [termLoading,setTermLoading]=useState(false);
 
   useEffect(()=>{
     const load=async()=>{
@@ -1247,7 +1295,64 @@ function AdminKeyDetail({keyObj,onBack}){
           style={{padding:"7px 14px",borderRadius:8,background:"#1F2937",color:"#9CA3AF",fontSize:12,fontWeight:700,border:"1px solid #374151",cursor:"pointer"}}>
           📋 Copy
         </button>
+        {keyObj.status!=="terminated"&&(
+          <button onClick={()=>setShowTerminate(true)}
+            style={{padding:"7px 14px",borderRadius:8,background:"#7F1D1D",color:"#FCA5A5",fontSize:12,fontWeight:700,border:"1px solid #991B1B",cursor:"pointer"}}>
+            🚫 Terminate Key
+          </button>
+        )}
       </div>
+
+      {/* Terminate Modal */}
+      {showTerminate&&(
+        <div style={{position:"fixed",inset:0,zIndex:9000,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(4px)",
+          display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:"#0F1117",border:"1px solid #374151",borderRadius:20,width:"100%",maxWidth:440,
+            boxShadow:"0 24px 64px rgba(0,0,0,0.5)"}}>
+            <div style={{padding:"20px 24px",borderBottom:"1px solid #1E2536",display:"flex",alignItems:"center",gap:12}}>
+              <div style={{width:36,height:36,borderRadius:10,background:"#7F1D1D",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>🚫</div>
+              <h3 style={{margin:0,fontSize:16,fontWeight:800,color:"#F9FAFB"}}>Terminate Key</h3>
+            </div>
+            <div style={{padding:24}}>
+              <p style={{margin:"0 0 6px",fontSize:13,color:"#9CA3AF",fontFamily:"monospace"}}>{keyObj.key}</p>
+              <p style={{margin:"0 0 16px",fontSize:13,color:"#D1D5DB",lineHeight:1.6}}>
+                This will permanently mark the key as <strong style={{color:"#FCA5A5"}}>Terminated</strong>. The customer will no longer be able to use it for any service.
+              </p>
+              <div style={{marginBottom:16}}>
+                <label style={{fontSize:11,fontWeight:700,color:"#6B7280",textTransform:"uppercase",letterSpacing:"0.05em",display:"block",marginBottom:6}}>
+                  Termination Reason / Note <span style={{color:"#EF4444"}}>*</span>
+                </label>
+                <textarea value={terminateNote} onChange={e=>setTerminateNote(e.target.value)}
+                  placeholder="e.g. Account country was changed by user in violation of service terms."
+                  rows={3}
+                  style={{width:"100%",background:"#161B27",border:"1px solid #374151",borderRadius:10,
+                    padding:"10px 13px",fontSize:13,color:"#F9FAFB",outline:"none",resize:"vertical",
+                    boxSizing:"border-box",fontFamily:"inherit"}}/>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <button onClick={()=>{setShowTerminate(false);setTerminateNote("");}}
+                  style={{padding:"10px 0",borderRadius:10,background:"#1F2937",color:"#9CA3AF",fontSize:13,fontWeight:700,border:"1px solid #374151",cursor:"pointer"}}>
+                  Cancel
+                </button>
+                <button disabled={!terminateNote.trim()||termLoading} onClick={async()=>{
+                  setTermLoading(true);
+                  try{
+                    await api.updateKey(keyObj._id,{status:"terminated",adminNote:terminateNote.trim()});
+                    setShowTerminate(false);setTerminateNote("");onBack();
+                  }finally{setTermLoading(false);}
+                }} style={{padding:"10px 0",borderRadius:10,
+                  background:!terminateNote.trim()?"#374151":"#991B1B",
+                  color:!terminateNote.trim()?"#6B7280":"#FCA5A5",
+                  fontSize:13,fontWeight:700,border:"none",cursor:!terminateNote.trim()?"not-allowed":"pointer",
+                  display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>
+                  {termLoading&&<Spinner size={13} color="#FCA5A5"/>}
+                  🚫 Confirm Terminate
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="two-col" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:4}}>
         {/* Key Details */}
@@ -1257,6 +1362,7 @@ function AdminKeyDetail({keyObj,onBack}){
           <Row label="Purchase Date" value={fmtDate(keyObj.purchaseDate)}/>
           <Row label="Used Date" value={fmtDate(keyObj.usedDate)}/>
           <Row label="Cooldown Until" value={keyObj.cooldownUntil?new Date(keyObj.cooldownUntil).toLocaleString():"None"} highlight={hasCooldown?"#FCD34D":undefined}/>
+          {keyObj.status==="terminated"&&<Row label="Termination Note" value={keyObj.adminNote||"No note provided"} highlight="#FCA5A5"/>}
         </Section>
 
         {/* Account Details */}
@@ -1455,6 +1561,31 @@ function AdminKeys(){
           </div>
         </div>
       )}
+
+      {/* Active Keys Stats */}
+      {keys.length>0&&(()=>{
+        const counts={
+          available: keys.filter(k=>k.status==="available").length,
+          active: keys.filter(k=>k.status==="processing"||k.status==="used_upgrade"||k.status==="used_renew").length,
+          cooldown: keys.filter(k=>k.status==="cooldown"||(k.cooldownUntil&&new Date(k.cooldownUntil)>new Date())).length,
+          terminated: keys.filter(k=>k.status==="terminated").length,
+        };
+        return(
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:16}}>
+            {[
+              {label:"Available",count:counts.available,color:"#6EE7B7",bg:"#064E3B",border:"#065F46"},
+              {label:"Active/Used",count:counts.active,color:"#A78BFA",bg:"#1E1B4B",border:"#312E81"},
+              {label:"On Cooldown",count:counts.cooldown,color:"#FCD34D",bg:"#1C1917",border:"#78350F"},
+              {label:"Terminated",count:counts.terminated,color:"#FCA5A5",bg:"#1C0A0A",border:"#7F1D1D"},
+            ].map(({label,count,color,bg,border})=>(
+              <div key={label} style={{background:bg,border:`1px solid ${border}`,borderRadius:12,padding:"14px 16px",textAlign:"center"}}>
+                <p style={{margin:"0 0 4px",fontSize:22,fontWeight:900,color}}>{count}</p>
+                <p style={{margin:0,fontSize:11,fontWeight:700,color,opacity:0.7,textTransform:"uppercase",letterSpacing:"0.05em"}}>{label}</p>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Actions */}
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,flexWrap:"wrap"}}>
