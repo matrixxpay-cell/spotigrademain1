@@ -14,79 +14,26 @@ const C = {
   cyan:"#0891B2", cyanLight:"#ECFEFF",
 };
 
-// ─── MOCK DB (simulates MongoDB spotigrader_main) ─────────────────────────────
-// In production replace this with fetch() calls to Express/MongoDB backend
-// MongoDB schema mirrors exactly what's defined here
-const DB = (() => {
-  const now = () => new Date().toISOString();
-  const uid = () => Math.random().toString(36).slice(2,10).toUpperCase();
-  const keyFmt = () => {
-    const s = () => Math.random().toString(36).slice(2,6).toUpperCase();
-    return `${s()}-${s()}-${s()}-${s()}`;
-  };
+// ─── API CLIENT (Express + MongoDB backend) ───────────────────────────────────
+const API = "http://45.13.239.204:3001/api";
 
-  let keys = [
-    { _id:"k1", key:"ABCD-1234-EFGH-5678", status:"available", usedFor:null, usedByEmail:null,
-      usedByUsername:null, country:null, plan:null, address:null,
-      purchaseDate:"2025-01-10T10:00:00.000Z", usedDate:null, cooldownUntil:null,
-      upgradeType:null, createdAt:"2025-01-10T10:00:00.000Z" },
-    { _id:"k2", key:"WXYZ-9876-MNOP-4321", status:"used_upgrade", usedFor:"upgrade",
-      usedByEmail:"john@example.com", usedByUsername:"john_music",
-      country:"US", plan:"individual_1m", address:null,
-      purchaseDate:"2025-02-01T09:00:00.000Z", usedDate:"2025-03-01T12:00:00.000Z",
-      cooldownUntil: new Date(Date.now()+8*24*60*60*1000).toISOString(),
-      upgradeType:"individual", createdAt:"2025-02-01T09:00:00.000Z" },
-    { _id:"k3", key:"LMNO-5555-PQRS-7777", status:"available",usedFor:null,usedByEmail:null,
-      usedByUsername:null,country:null,plan:null,address:null,
-      purchaseDate:"2025-03-15T08:00:00.000Z",usedDate:null,cooldownUntil:null,
-      upgradeType:null,createdAt:"2025-03-15T08:00:00.000Z" },
-  ];
-  let upgradeRequests = [];
-  let renewRequests = [];
-
-  return {
-    // KEYS
-    getKeys: () => [...keys],
-    getKey: (keyStr) => keys.find(k=>k.key===keyStr)||null,
-    generateKeys: (count) => {
-      const newKeys = Array.from({length:count},()=>({
-        _id:uid(), key:keyFmt(), status:"available", usedFor:null,
-        usedByEmail:null, usedByUsername:null, country:null, plan:null, address:null,
-        purchaseDate:now(), usedDate:null, cooldownUntil:null, upgradeType:null, createdAt:now()
-      }));
-      keys = [...keys,...newKeys];
-      return newKeys;
-    },
-    deleteKeys: (ids) => { keys = keys.filter(k=>!ids.includes(k._id)); },
-    updateKey: (id, update) => {
-      keys = keys.map(k=>k._id===id?{...k,...update}:k);
-    },
-    // UPGRADE REQUESTS
-    createUpgradeRequest: (data) => {
-      const req = {_id:uid(), ...data, status:"pending", createdAt:now(), adminNote:null,
-        confirmedUsername:null, plan:null, duration:null, address:null, countryUpgraded:null};
-      upgradeRequests.push(req);
-      return req;
-    },
-    getUpgradeRequests: () => [...upgradeRequests].reverse(),
-    getUpgradeRequest: (id) => upgradeRequests.find(r=>r._id===id)||null,
-    updateUpgradeRequest: (id, update) => {
-      upgradeRequests = upgradeRequests.map(r=>r._id===id?{...r,...update}:r);
-    },
-    // RENEW REQUESTS
-    createRenewRequest: (data) => {
-      const req = {_id:uid(), ...data, status:"pending", createdAt:now(), adminNote:null,
-        proofStatus:null, confirmedUsername:null};
-      renewRequests.push(req);
-      return req;
-    },
-    getRenewRequests: () => [...renewRequests].reverse(),
-    getRenewRequest: (id) => renewRequests.find(r=>r._id===id)||null,
-    updateRenewRequest: (id, update) => {
-      renewRequests = renewRequests.map(r=>r._id===id?{...r,...update}:r);
-    },
-  };
-})();
+const api = {
+  // KEYS
+  getKeys:       ()        => fetch(`${API}/keys`).then(r=>r.json()),
+  getKey:        (keyStr)  => fetch(`${API}/keys/by-key/${encodeURIComponent(keyStr)}`).then(r=>r.ok?r.json():null),
+  getKeyByUser:  (username)=> fetch(`${API}/keys/by-username/${encodeURIComponent(username)}`).then(r=>r.ok?r.json():null),
+  generateKeys:  (count)   => fetch(`${API}/keys/generate`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({count})}).then(r=>r.json()),
+  deleteKeys:    (ids)     => fetch(`${API}/keys`,{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({ids})}).then(r=>r.json()),
+  updateKey:     (id,data) => fetch(`${API}/keys/${id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)}).then(r=>r.json()),
+  // UPGRADE REQUESTS
+  getUpgradeRequests:    ()      => fetch(`${API}/upgrade-requests`).then(r=>r.json()),
+  createUpgradeRequest:  (data)  => fetch(`${API}/upgrade-requests`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)}).then(r=>r.json()),
+  updateUpgradeRequest:  (id,d)  => fetch(`${API}/upgrade-requests/${id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}).then(r=>r.json()),
+  // RENEW REQUESTS
+  getRenewRequests:    ()      => fetch(`${API}/renew-requests`).then(r=>r.json()),
+  createRenewRequest:  (data)  => fetch(`${API}/renew-requests`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)}).then(r=>r.json()),
+  updateRenewRequest:  (id,d)  => fetch(`${API}/renew-requests/${id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}).then(r=>r.json()),
+};
 
 // ─── SHARED UI ────────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
@@ -393,20 +340,19 @@ function KeyInfoPage({prefillKey="",onRenew}){
   const [data,setData]=useState(null);
   const [err,setErr]=useState("");
 
-  const lookup=useCallback((q,byUsername=false)=>{
+  const lookup=useCallback(async(q,byUsername=false)=>{
     if(!q.trim())return;
     setLoading(true);setData(null);setErr("");
-    setTimeout(()=>{
-      setLoading(false);
-      let found=byUsername
-        ?DB.getKeys().find(k=>k.usedByUsername===q.trim())
-        :DB.getKey(q.trim());
+    try{
+      const found=byUsername
+        ?await api.getKeyByUser(q.trim())
+        :await api.getKey(q.trim());
       if(!found){setErr("No record found for this "+(byUsername?"username":"key")+".");return;}
-      // determine display status
       let displayStatus=found.status;
       if(found.cooldownUntil&&new Date(found.cooldownUntil)>new Date())displayStatus="cooldown";
       setData({...found,displayStatus});
-    },900);
+    }catch(e){setErr("Server error. Please try again.");}
+    finally{setLoading(false);}
   },[]);
 
   useEffect(()=>{if(prefillKey){setKeyInput(prefillKey);lookup(prefillKey);}},[ prefillKey]);
@@ -689,29 +635,33 @@ function UpgradePage({onViewStatus}){
   const [reqId,setReqId]=useState(null);
   const [keyErr,setKeyErr]=useState("");
 
-  const validateKey=()=>{
-    setKeyErr("");
-    const k=DB.getKey(key.trim());
-    if(!k){setKeyErr("Key not found. Please check and try again.");return;}
-    if(k.status!=="available"){
-      if(k.status==="used_upgrade"||k.status==="used_renew"){setKeyErr("This key has already been used and cannot be used for a new upgrade.");}
-      else if(k.cooldownUntil&&new Date(k.cooldownUntil)>new Date()){
-        setKeyErr(`Key is on cooldown for ${cooldownLeft(k.cooldownUntil)} more.`);
-      } else {setKeyErr("This key is not available for upgrade.");}
-      return;
-    }
-    setStep(1);
+  const validateKey=async()=>{
+    setKeyErr("");setLoading(true);
+    try{
+      const k=await api.getKey(key.trim());
+      if(!k){setKeyErr("Key not found. Please check and try again.");return;}
+      if(k.status!=="available"){
+        if(k.status==="used_upgrade"||k.status==="used_renew"){setKeyErr("This key has already been used and cannot be used for a new upgrade.");}
+        else if(k.cooldownUntil&&new Date(k.cooldownUntil)>new Date()){
+          setKeyErr(`Key is on cooldown for ${cooldownLeft(k.cooldownUntil)} more.`);
+        } else {setKeyErr("This key is not available for upgrade.");}
+        return;
+      }
+      setStep(1);
+    }catch(e){setKeyErr("Server error. Please try again.");}
+    finally{setLoading(false);}
   };
 
-  const handleSubmit=()=>{
+  const handleSubmit=async()=>{
     setLoading(true);
-    setTimeout(()=>{
-      const req=DB.createUpgradeRequest({key:key.trim(),email,country,step:"submitted"});
-      // mark key as pending
-      const k=DB.getKey(key.trim());
-      if(k)DB.updateKey(k._id,{status:"processing"});
-      setReqId(req._id);setLoading(false);setSubmitted(true);
-    },1400);
+    try{
+      const req=await api.createUpgradeRequest({key:key.trim(),email,country});
+      const k=await api.getKey(key.trim());
+      if(k)await api.updateKey(k._id,{status:"processing"});
+      setReqId(req._id);setSubmitted(true);
+    }catch(e){setKeyErr("Server error. Please try again.");}
+    finally{setLoading(false);}
+    return; // replaces setTimeout block below
   };
 
   const reset=()=>{setStep(0);setKey("");setEmail("");setPass("");setCountry("");setSubmitted(false);setReqId(null);setKeyErr("");};
@@ -817,29 +767,33 @@ function RenewPage({onViewStatus,prefillKey=""}){
   const [submitted,setSubmitted]=useState(false);
   const [keyErr,setKeyErr]=useState("");
 
-  const validateKey=()=>{
-    setKeyErr("");
-    const k=DB.getKey(key.trim());
-    if(!k){setKeyErr("Key not found.");return;}
-    if(k.status==="available"){setKeyErr("This key hasn't been used for an upgrade yet.");return;}
-    if(k.status!=="used_upgrade"){setKeyErr("This key cannot be renewed (not an upgrade key or already renewed).");return;}
-    if(k.cooldownUntil&&new Date(k.cooldownUntil)>new Date()){
-      setKeyErr(`Key is on cooldown for ${cooldownLeft(k.cooldownUntil)} more.`);return;
-    }
-    setStep(1);
+  const validateKey=async()=>{
+    setKeyErr("");setLoading(true);
+    try{
+      const k=await api.getKey(key.trim());
+      if(!k){setKeyErr("Key not found.");return;}
+      if(k.status==="available"){setKeyErr("This key hasn't been used for an upgrade yet.");return;}
+      if(k.status!=="used_upgrade"){setKeyErr("This key cannot be renewed (not an upgrade key or already renewed).");return;}
+      if(k.cooldownUntil&&new Date(k.cooldownUntil)>new Date()){
+        setKeyErr(`Key is on cooldown for ${cooldownLeft(k.cooldownUntil)} more.`);return;
+      }
+      setStep(1);
+    }catch(e){setKeyErr("Server error. Please try again.");}
+    finally{setLoading(false);}
   };
 
   const handleOldNext=()=>setShowModal(true);
   const handleConfirm=()=>{setShowModal(false);setStep(3);};
 
-  const handleSubmit=()=>{
+  const handleSubmit=async()=>{
     setLoading(true);
-    setTimeout(()=>{
-      DB.createRenewRequest({key:key.trim(),oldEmail,newEmail,country,files:files.map(f=>f.name)});
-      const k=DB.getKey(key.trim());
-      if(k)DB.updateKey(k._id,{status:"processing"});
-      setLoading(false);setSubmitted(true);
-    },1400);
+    try{
+      await api.createRenewRequest({key:key.trim(),oldEmail,newEmail,country,files:files.map(f=>f.name)});
+      const k=await api.getKey(key.trim());
+      if(k)await api.updateKey(k._id,{status:"processing"});
+      setSubmitted(true);
+    }catch(e){setKeyErr("Server error. Please try again.");}
+    finally{setLoading(false);}
   };
 
   const reset=()=>{setStep(0);setKey(prefillKey||"");setOldEmail("");setOldPass("");setNewEmail("");setNewPass("");setFiles([]);setCountry("");setSubmitted(false);setKeyErr("");};
@@ -1038,28 +992,29 @@ function AdminPanel(){
 
 // ─── Admin: Key Management ────────────────────────────────────────────────────
 function AdminKeys(){
-  const [keys,setKeys]=useState(()=>DB.getKeys());
+  const [keys,setKeys]=useState([]);
   const [selected,setSelected]=useState([]);
   const [genCount,setGenCount]=useState("10");
   const [genLoading,setGenLoading]=useState(false);
   const [copied,setCopied]=useState(null);
 
-  const refresh=()=>setKeys(DB.getKeys());
+  const refresh=()=>api.getKeys().then(setKeys).catch(()=>{});
+  useEffect(()=>{refresh();},[]);
 
-  const generate=()=>{
+  const generate=async()=>{
     const n=parseInt(genCount)||1;
     if(n<1||n>500)return;
     setGenLoading(true);
-    setTimeout(()=>{DB.generateKeys(n);refresh();setGenLoading(false);},600);
+    try{await api.generateKeys(n);await refresh();}finally{setGenLoading(false);}
   };
 
-  const deleteSelected=()=>{
+  const deleteSelected=async()=>{
     if(selected.length===0)return;
-    DB.deleteKeys(selected);refresh();setSelected([]);
+    await api.deleteKeys(selected);await refresh();setSelected([]);
   };
-  const deleteAll=()=>{
+  const deleteAll=async()=>{
     if(!window.confirm("Delete ALL keys? This cannot be undone."))return;
-    DB.deleteKeys(keys.map(k=>k._id));refresh();setSelected([]);
+    await api.deleteKeys(keys.map(k=>k._id));await refresh();setSelected([]);
   };
 
   const toggle=(id)=>setSelected(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id]);
@@ -1172,10 +1127,11 @@ function AdminKeys(){
 
 // ─── Admin: Upgrade Requests ──────────────────────────────────────────────────
 function AdminUpgrades(){
-  const [requests,setRequests]=useState(()=>DB.getUpgradeRequests());
+  const [requests,setRequests]=useState([]);
   const [selected,setSelected]=useState(null);
 
-  const refresh=()=>setRequests(DB.getUpgradeRequests());
+  const refresh=()=>api.getUpgradeRequests().then(setRequests).catch(()=>{});
+  useEffect(()=>{refresh();},[]);
 
   return(
     <div>
@@ -1232,21 +1188,21 @@ function AdminUpgradeDetail({req,onBack,onRefresh}){
   const [done,setDone]=useState(req.status==="approved");
   const [r,setR]=useState(req);
 
-  const confirmUsername=()=>{
+  const confirmUsername=async()=>{
     if(!username.trim())return;
-    DB.updateUpgradeRequest(r._id,{confirmedUsername:username.trim()});
+    await api.updateUpgradeRequest(r._id,{confirmedUsername:username.trim()});
     setUsernameConfirmed(true);
     setR({...r,confirmedUsername:username.trim()});
   };
 
-  const handleApprove=()=>{
+  const handleApprove=async()=>{
     if(!upgradeType||!plan||!country)return;
     setLoading(true);
-    setTimeout(()=>{
+    try{
       const cooldown=new Date(Date.now()+15*24*60*60*1000).toISOString();
-      const k=DB.getKey(r.key);
+      const k=await api.getKey(r.key);
       if(k){
-        DB.updateKey(k._id,{
+        await api.updateKey(k._id,{
           status:"used_upgrade",usedFor:"upgrade",
           usedByEmail:r.email,usedByUsername:username.trim(),
           country,plan,address:address||null,
@@ -1254,18 +1210,18 @@ function AdminUpgradeDetail({req,onBack,onRefresh}){
           cooldownUntil:cooldown,
         });
       }
-      DB.updateUpgradeRequest(r._id,{
+      await api.updateUpgradeRequest(r._id,{
         status:"approved",confirmedUsername:username.trim(),
         upgradeType,plan,duration,address,countryUpgraded:country,
       });
-      setDone(true);setLoading(false);onRefresh();
-    },1200);
+      setDone(true);onRefresh();
+    }finally{setLoading(false);}
   };
 
-  const handleDecline=()=>{
-    DB.updateUpgradeRequest(r._id,{status:"declined"});
-    const k=DB.getKey(r.key);
-    if(k)DB.updateKey(k._id,{status:"available"});
+  const handleDecline=async()=>{
+    await api.updateUpgradeRequest(r._id,{status:"declined"});
+    const k=await api.getKey(r.key);
+    if(k)await api.updateKey(k._id,{status:"available"});
     onBack();onRefresh();
   };
 
@@ -1406,9 +1362,10 @@ function AdminUpgradeDetail({req,onBack,onRefresh}){
 
 // ─── Admin: Renewal Requests ──────────────────────────────────────────────────
 function AdminRenewals(){
-  const [requests,setRequests]=useState(()=>DB.getRenewRequests());
+  const [requests,setRequests]=useState([]);
   const [selected,setSelected]=useState(null);
-  const refresh=()=>setRequests(DB.getRenewRequests());
+  const refresh=()=>api.getRenewRequests().then(setRequests).catch(()=>{});
+  useEffect(()=>{refresh();},[]);
 
   return(
     <div>
@@ -1459,35 +1416,36 @@ function AdminRenewDetail({req,onBack,onRefresh}){
   const [loading,setLoading]=useState(false);
   const [done,setDone]=useState(req.status==="approved");
 
-  // Fetch original key's username for comparison
-  const originalKey=DB.getKey(r.key);
-  const originalUsername=originalKey?.usedByUsername||null;
+  const [originalUsername,setOriginalUsername]=useState(null);
+  useEffect(()=>{
+    api.getKey(r.key).then(k=>setOriginalUsername(k?.usedByUsername||null)).catch(()=>{});
+  },[r.key]);
 
-  const checkUsername=()=>{
+  const checkUsername=async()=>{
     setUsernameError("");
     if(enteredUsername.trim()!==originalUsername){
       setUsernameError(`Username doesn't match! Expected: @${originalUsername}. Please decline this request.`);
       return;
     }
     setUsernameMatch(true);
-    DB.updateRenewRequest(r._id,{confirmedUsername:enteredUsername.trim()});
+    await api.updateRenewRequest(r._id,{confirmedUsername:enteredUsername.trim()});
     setR({...r,confirmedUsername:enteredUsername.trim()});
   };
 
-  const setProof=(status)=>{
+  const setProof=async(status)=>{
     setProofStatus(status);
-    DB.updateRenewRequest(r._id,{proofStatus:status});
+    await api.updateRenewRequest(r._id,{proofStatus:status});
     setR({...r,proofStatus:status});
   };
 
-  const handleApprove=()=>{
+  const handleApprove=async()=>{
     if(!usernameMatch||proofStatus!=="confirmed")return;
     setLoading(true);
-    setTimeout(()=>{
+    try{
       const cooldown=new Date(Date.now()+15*24*60*60*1000).toISOString();
-      const k=DB.getKey(r.key);
+      const k=await api.getKey(r.key);
       if(k){
-        DB.updateKey(k._id,{
+        await api.updateKey(k._id,{
           status:"used_renew",usedFor:"renew",
           usedByEmail:r.newEmail,
           usedDate:new Date().toISOString(),
@@ -1495,15 +1453,15 @@ function AdminRenewDetail({req,onBack,onRefresh}){
           country:r.country,
         });
       }
-      DB.updateRenewRequest(r._id,{status:"approved"});
-      setDone(true);setLoading(false);onRefresh();
-    },1200);
+      await api.updateRenewRequest(r._id,{status:"approved"});
+      setDone(true);onRefresh();
+    }finally{setLoading(false);}
   };
 
-  const handleDecline=()=>{
-    DB.updateRenewRequest(r._id,{status:"declined"});
-    const k=DB.getKey(r.key);
-    if(k)DB.updateKey(k._id,{status:"used_upgrade"});
+  const handleDecline=async()=>{
+    await api.updateRenewRequest(r._id,{status:"declined"});
+    const k=await api.getKey(r.key);
+    if(k)await api.updateKey(k._id,{status:"used_upgrade"});
     onBack();onRefresh();
   };
 
