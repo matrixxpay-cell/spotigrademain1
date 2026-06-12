@@ -3081,8 +3081,18 @@ export default function App(){
             </div>
             <span style={{fontSize:12,color:C.textSub,fontWeight:500}}>SpotiGrader.cc — Lifetime Spotify Upgrades</span>
           </div>
-          <div style={{display:"flex",gap:14,fontSize:11,color:C.textMuted,fontWeight:600}}>
+          <div style={{display:"flex",alignItems:"center",gap:14,fontSize:11,color:C.textMuted,fontWeight:600,flexWrap:"wrap"}}>
             <span>No logs kept</span><span>·</span><span>Encrypted</span><span>·</span><span>Lifetime guarantee</span>
+            <span>·</span>
+            <a href="https://t.me/spotigradersupportbot" target="_blank" rel="noopener noreferrer"
+              style={{display:"inline-flex",alignItems:"center",gap:5,padding:"4px 11px",borderRadius:999,
+                background:"#229ED9",color:"#fff",fontWeight:700,fontSize:11,textDecoration:"none",
+                transition:"opacity 0.15s"}}
+              onMouseEnter={e=>e.currentTarget.style.opacity="0.85"}
+              onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M9.417 15.181l-.397 5.584c.568 0 .814-.244 1.109-.537l2.663-2.545 5.518 4.041c1.012.564 1.725.267 1.998-.931L23.93 3.821c.321-1.496-.541-2.081-1.527-1.714L1.08 10.333c-1.453.564-1.431 1.374-.247 1.741l5.443 1.693L18.94 6.218c.575-.385 1.095-.172.666.213z"/></svg>
+              Support
+            </a>
           </div>
         </div>
       </footer>
