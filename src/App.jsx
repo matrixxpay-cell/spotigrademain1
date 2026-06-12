@@ -392,11 +392,12 @@ function KeyInfoPage({prefillKey="",onRenew}){
   const [usernameInput,setUsernameInput]=useState("");
   const [loading,setLoading]=useState(false);
   const [data,setData]=useState(null);
+  const [requests,setRequests]=useState([]);
   const [err,setErr]=useState("");
 
   const lookup=useCallback(async(q,byUsername=false)=>{
     if(!q.trim())return;
-    setLoading(true);setData(null);setErr("");
+    setLoading(true);setData(null);setErr("");setRequests([]);
     try{
       const found=byUsername
         ?await api.getKeyByUser(q.trim())
@@ -405,6 +406,16 @@ function KeyInfoPage({prefillKey="",onRenew}){
       let displayStatus=found.status;
       if(found.cooldownUntil&&new Date(found.cooldownUntil)>new Date())displayStatus="cooldown";
       setData({...found,displayStatus});
+      // Fetch all requests for this key to show declined info
+      const [upgrades,renewals]=await Promise.all([
+        api.getUpgradeRequests(),api.getRenewRequests(),
+      ]);
+      const keyStr=found.key;
+      const allReqs=[
+        ...upgrades.filter(r=>r.key===keyStr).map(r=>({...r,_type:"upgrade"})),
+        ...renewals.filter(r=>r.key===keyStr).map(r=>({...r,_type:"renew"})),
+      ].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+      setRequests(allReqs);
     }catch(e){setErr("Server error. Please try again.");}
     finally{setLoading(false);}
   },[]);
@@ -457,6 +468,22 @@ function KeyInfoPage({prefillKey="",onRenew}){
       {/* Result */}
       {data&&(
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          {/* Declined request banners */}
+          {requests.filter(r=>r.status==="declined").map(r=>(
+            <div key={r._id} style={{padding:"14px 16px",borderRadius:14,background:C.redLight,
+              border:`1px solid ${C.redBorder}`,display:"flex",gap:12,alignItems:"flex-start"}}>
+              <span style={{fontSize:20,flexShrink:0}}>❌</span>
+              <div>
+                <p style={{margin:"0 0 3px",fontSize:13,fontWeight:800,color:C.redText}}>
+                  {r._type==="renew"?"Renewal":"Upgrade"} Request Declined
+                  <span style={{fontSize:11,fontWeight:500,marginLeft:8,opacity:0.7}}>{fmtDate(r.createdAt)}</span>
+                </p>
+                {r.declineReason
+                  ?<p style={{margin:0,fontSize:13,color:C.redText}}><strong>Reason:</strong> {r.declineReason}</p>
+                  :<p style={{margin:0,fontSize:12,color:C.redText,opacity:0.8}}>No reason provided. Contact support.</p>}
+              </div>
+            </div>
+          ))}
           {/* Status banner */}
           {data.displayStatus==="cooldown"&&(
             <InfoBox type="warn">
@@ -1292,6 +1319,24 @@ function AdminKeys(){
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,flexWrap:"wrap"}}>
         <span style={{fontSize:13,color:"#9CA3AF"}}>{keys.length} total · {selected.length} selected</span>
         <div style={{flex:1}}/>
+        {/* Download buttons */}
+        <button onClick={()=>{
+          const avail=keys.filter(k=>k.status==="available");
+          if(!avail.length)return;
+          const txt=avail.map(k=>k.key).join("\n");
+          const a=document.createElement("a");a.href="data:text/plain;charset=utf-8,"+encodeURIComponent(txt);
+          a.download="available-keys.txt";a.click();
+        }} style={{padding:"7px 14px",borderRadius:8,background:"#064E3B",color:"#6EE7B7",fontSize:12,fontWeight:700,border:"1px solid #065F46",cursor:"pointer"}}>
+          ↓ Download Available
+        </button>
+        <button onClick={()=>{
+          const toDownload=selected.length>0?keys.filter(k=>selected.includes(k._id)):keys;
+          const txt=toDownload.map(k=>k.key).join("\n");
+          const a=document.createElement("a");a.href="data:text/plain;charset=utf-8,"+encodeURIComponent(txt);
+          a.download="keys.txt";a.click();
+        }} style={{padding:"7px 14px",borderRadius:8,background:"#1E3A5F",color:"#93C5FD",fontSize:12,fontWeight:700,border:"1px solid #1D4ED8",cursor:"pointer"}}>
+          ↓ Download {selected.length>0?`Selected (${selected.length})`:"All"}
+        </button>
         {selected.length>0&&(
           <button onClick={deleteSelected}
             style={{padding:"7px 14px",borderRadius:8,background:"#7F1D1D",color:"#FCA5A5",
