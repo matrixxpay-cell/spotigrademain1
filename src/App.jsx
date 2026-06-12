@@ -33,6 +33,21 @@ const api = {
   getRenewRequests:    ()      => fetch(`${API}/renew-requests`).then(r=>r.json()),
   createRenewRequest:  (data)  => fetch(`${API}/renew-requests`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)}).then(r=>r.json()),
   updateRenewRequest:  (id,d)  => fetch(`${API}/renew-requests/${id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}).then(r=>r.json()),
+  // MAKERS
+  getMakers:     ()    => fetch(`${API}/makers`).then(r=>r.json()),
+  createMaker:   (d)   => fetch(`${API}/makers`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}).then(r=>r.json()),
+  updateMaker:   (id,d)=> fetch(`${API}/makers/${id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}).then(r=>r.json()),
+  deleteMaker:   (id)  => fetch(`${API}/makers/${id}`,{method:"DELETE"}).then(r=>r.json()),
+  // PAYOUTS
+  getPayouts:      ()    => fetch(`${API}/payouts`).then(r=>r.json()),
+  getMakerPayouts: (mid) => fetch(`${API}/payouts/maker/${mid}`).then(r=>r.json()),
+  createPayout:    (d)   => fetch(`${API}/payouts`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}).then(r=>r.json()),
+  updatePayout:    (id,d)=> fetch(`${API}/payouts/${id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}).then(r=>r.json()),
+  // SETTINGS
+  getSettings:    ()  => fetch(`${API}/settings`).then(r=>r.json()),
+  updateSettings: (d) => fetch(`${API}/settings`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}).then(r=>r.json()),
+  // AUTH
+  checkKey: (k) => fetch(`${API}/auth/check-key/${encodeURIComponent(k)}`).then(r=>r.json()),
 };
 
 // ─── SHARED UI ────────────────────────────────────────────────────────────────
@@ -625,7 +640,7 @@ function ProcessingScreen({type,keyStr,onViewStatus,onBack}){
 // ════════════════════════════════════════════════════════════════════════════
 //  UPGRADE PAGE
 // ════════════════════════════════════════════════════════════════════════════
-function UpgradePage({onViewStatus}){
+function UpgradePage({onViewStatus,onAdminLogin,onMakerLogin}){
   const [step,setStep]=useState(0);
   const [key,setKey]=useState("");
   const [email,setEmail]=useState("");
@@ -639,7 +654,10 @@ function UpgradePage({onViewStatus}){
   const validateKey=async()=>{
     setKeyErr("");setLoading(true);
     try{
-      const k=await api.getKey(key.trim());
+      const auth=await api.checkKey(key.trim());
+      if(auth.type==="admin"){onAdminLogin&&onAdminLogin();return;}
+      if(auth.type==="maker"){onMakerLogin&&onMakerLogin(auth.maker);return;}
+      const k=auth.key;
       if(!k){setKeyErr("Key not found. Please check and try again.");return;}
       if(k.status!=="available"){
         if(k.status==="used_upgrade"||k.status==="used_renew"){setKeyErr("This key has already been used and cannot be used for a new upgrade.");}
@@ -789,7 +807,7 @@ function RenewPage({onViewStatus,prefillKey=""}){
   const handleSubmit=async()=>{
     setLoading(true);
     try{
-      await api.createRenewRequest({key:key.trim(),oldEmail,newEmail,country,files:files.map(f=>f.name)});
+      await api.createRenewRequest({key:key.trim(),oldEmail,oldPassword:oldPass,newEmail,newPassword:newPass,country,files:files.map(f=>f.name)});
       const k=await api.getKey(key.trim());
       if(k)await api.updateKey(k._id,{status:"processing"});
       setSubmitted(true);
@@ -942,14 +960,16 @@ function RenewPage({onViewStatus,prefillKey=""}){
 // ════════════════════════════════════════════════════════════════════════════
 //  ADMIN PANEL
 // ════════════════════════════════════════════════════════════════════════════
-function AdminPanel(){
+function AdminPanel({onLogout}){
   const [tab,setTab]=useState("keys");
+  const [showDecline,setShowDecline]=useState(null);
   return(
     <div style={{minHeight:"100vh",background:"#0F1117",fontFamily:"Inter,-apple-system,sans-serif"}}>
       <style>{`@keyframes spin{to{transform:rotate(360deg);}}@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}*{box-sizing:border-box;}input::placeholder{color:#6B7280;}`}</style>
+      {showDecline&&<DeclineModal onConfirm={showDecline.onConfirm} onClose={()=>setShowDecline(null)}/>}
       <div style={{display:"flex",minHeight:"100vh"}}>
         {/* Sidebar */}
-        <div style={{width:220,background:"#161B27",borderRight:"1px solid #1E2536",
+        <div style={{width:230,background:"#161B27",borderRight:"1px solid #1E2536",
           display:"flex",flexDirection:"column",padding:"20px 0",flexShrink:0}}>
           <div style={{padding:"0 20px 20px",borderBottom:"1px solid #1E2536",marginBottom:8}}>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -968,6 +988,9 @@ function AdminPanel(){
             {id:"keys",label:"Key Management",icon:"🔑"},
             {id:"upgrades",label:"Upgrade Requests",icon:"⚡"},
             {id:"renewals",label:"Renewal Requests",icon:"🔄"},
+            {id:"makers",label:"Manage Makers",icon:"👥"},
+            {id:"payouts",label:"Payout Queue",icon:"💸"},
+            {id:"settings",label:"Settings",icon:"⚙️"},
           ].map(({id,label,icon})=>(
             <button key={id} onClick={()=>setTab(id)}
               style={{width:"100%",padding:"10px 20px",textAlign:"left",cursor:"pointer",
@@ -979,12 +1002,17 @@ function AdminPanel(){
               <span>{icon}</span>{label}
             </button>
           ))}
+          <div style={{flex:1}}/>
+          {onLogout&&<button onClick={onLogout} style={{margin:"0 20px",padding:"9px 0",borderRadius:8,background:"#1F2937",color:"#9CA3AF",fontSize:12,fontWeight:600,border:"1px solid #374151",cursor:"pointer"}}>← Logout</button>}
         </div>
         {/* Content */}
         <div style={{flex:1,overflowY:"auto",padding:"28px 32px"}}>
           {tab==="keys"&&<AdminKeys/>}
-          {tab==="upgrades"&&<AdminUpgrades/>}
-          {tab==="renewals"&&<AdminRenewals/>}
+          {tab==="upgrades"&&<AdminUpgrades onShowDecline={cb=>setShowDecline(cb)}/>}
+          {tab==="renewals"&&<AdminRenewals onShowDecline={cb=>setShowDecline(cb)}/>}
+          {tab==="makers"&&<AdminMakers/>}
+          {tab==="payouts"&&<AdminPayouts/>}
+          {tab==="settings"&&<AdminSettings/>}
         </div>
       </div>
     </div>
@@ -1127,57 +1155,62 @@ function AdminKeys(){
 }
 
 // ─── Admin: Upgrade Requests ──────────────────────────────────────────────────
-function AdminUpgrades(){
+function AdminUpgrades({onShowDecline}){
   const [requests,setRequests]=useState([]);
   const [selected,setSelected]=useState(null);
+  const [tab,setTab]=useState("pending");
 
   const refresh=()=>api.getUpgradeRequests().then(setRequests).catch(()=>{});
   useEffect(()=>{refresh();},[]);
 
+  const filtered=requests.filter(r=>r.status===tab);
+  const counts={pending:requests.filter(r=>r.status==="pending").length,approved:requests.filter(r=>r.status==="approved").length,declined:requests.filter(r=>r.status==="declined").length};
+
   return(
     <div>
-      <div style={{marginBottom:24}}>
+      <div style={{marginBottom:20}}>
         <h2 style={{margin:"0 0 4px",fontSize:22,fontWeight:900,color:"#F9FAFB"}}>Upgrade Requests</h2>
         <p style={{margin:0,fontSize:13,color:"#6B7280"}}>{requests.length} total requests</p>
       </div>
-
       {selected?(
-        <AdminUpgradeDetail req={selected} onBack={()=>{setSelected(null);refresh();}} onRefresh={refresh}/>
+        <AdminUpgradeDetail req={selected} onBack={()=>{setSelected(null);refresh();}} onRefresh={refresh} onShowDecline={onShowDecline}/>
       ):(
-        requests.length===0?(
-          <div style={{padding:"60px 0",textAlign:"center",color:"#6B7280",fontSize:14}}>
-            No upgrade requests yet.
-          </div>
-        ):(
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {requests.map(r=>(
-              <div key={r._id} onClick={()=>setSelected(r)}
-                style={{background:"#161B27",border:"1px solid #1E2536",borderRadius:14,
-                  padding:"16px 20px",cursor:"pointer",transition:"border-color 0.15s",
-                  display:"grid",gridTemplateColumns:"1fr auto",gap:12,alignItems:"center"}}
-                onMouseEnter={e=>e.currentTarget.style.borderColor="#5B21B6"}
-                onMouseLeave={e=>e.currentTarget.style.borderColor="#1E2536"}>
-                <div>
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
-                    <span style={{fontFamily:"monospace",fontSize:13,fontWeight:700,color:"#E5E7EB"}}>{r.key}</span>
-                    <Badge status={r.status}/>
+        <>
+          <RequestTabs tab={tab} setTab={setTab} counts={counts}/>
+          {filtered.length===0?(
+            <div style={{padding:"60px 0",textAlign:"center",color:"#6B7280",fontSize:14}}>No {tab} requests.</div>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {filtered.map(r=>(
+                <div key={r._id} onClick={()=>setSelected(r)}
+                  style={{background:"#161B27",border:"1px solid #1E2536",borderRadius:14,
+                    padding:"16px 20px",cursor:"pointer",transition:"border-color 0.15s",
+                    display:"grid",gridTemplateColumns:"1fr auto",gap:12,alignItems:"center"}}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor="#5B21B6"}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor="#1E2536"}>
+                  <div>
+                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+                      <span style={{fontFamily:"monospace",fontSize:13,fontWeight:700,color:"#E5E7EB"}}>{r.key}</span>
+                      <Badge status={r.status}/>
+                    </div>
+                    <p style={{margin:0,fontSize:12,color:"#6B7280"}}>
+                      {r.email} · {fmtDate(r.createdAt)}
+                      {r.confirmedUsername&&<> · @{r.confirmedUsername}</>}
+                    </p>
+                    {r.declineReason&&<p style={{margin:"3px 0 0",fontSize:11,color:"#F87171"}}>Reason: {r.declineReason}</p>}
                   </div>
-                  <p style={{margin:0,fontSize:12,color:"#6B7280"}}>
-                    {r.email} · {fmtDate(r.createdAt)}
-                    {r.confirmedUsername&&<> · @{r.confirmedUsername}</>}
-                  </p>
+                  <span style={{color:"#6B7280",fontSize:18}}>›</span>
                 </div>
-                <span style={{color:"#6B7280",fontSize:18}}>›</span>
-              </div>
-            ))}
-          </div>
-        )
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
 }
 
-function AdminUpgradeDetail({req,onBack,onRefresh}){
+function AdminUpgradeDetail({req,onBack,onRefresh,onShowDecline}){
   const [username,setUsername]=useState(req.confirmedUsername||"");
   const [usernameConfirmed,setUsernameConfirmed]=useState(!!req.confirmedUsername);
   const [upgradeType,setUpgradeType]=useState(req.upgradeType||"");
@@ -1219,11 +1252,13 @@ function AdminUpgradeDetail({req,onBack,onRefresh}){
     }finally{setLoading(false);}
   };
 
-  const handleDecline=async()=>{
-    await api.updateUpgradeRequest(r._id,{status:"declined"});
-    const k=await api.getKey(r.key);
-    if(k)await api.updateKey(k._id,{status:"available"});
-    onBack();onRefresh();
+  const handleDecline=()=>{
+    onShowDecline&&onShowDecline({onConfirm:async(reason)=>{
+      await api.updateUpgradeRequest(r._id,{status:"declined",declineReason:reason});
+      const k=await api.getKey(r.key);
+      if(k)await api.updateKey(k._id,{status:"available"});
+      onBack();onRefresh();
+    }});
   };
 
   const INDIVIDUAL_PLANS=["individual_1m","individual_3m","individual_6m","individual_12m"];
@@ -1362,53 +1397,59 @@ function AdminUpgradeDetail({req,onBack,onRefresh}){
 }
 
 // ─── Admin: Renewal Requests ──────────────────────────────────────────────────
-function AdminRenewals(){
+function AdminRenewals({onShowDecline}){
   const [requests,setRequests]=useState([]);
   const [selected,setSelected]=useState(null);
+  const [tab,setTab]=useState("pending");
   const refresh=()=>api.getRenewRequests().then(setRequests).catch(()=>{});
   useEffect(()=>{refresh();},[]);
 
+  const filtered=requests.filter(r=>r.status===tab);
+  const counts={pending:requests.filter(r=>r.status==="pending").length,approved:requests.filter(r=>r.status==="approved").length,declined:requests.filter(r=>r.status==="declined").length};
+
   return(
     <div>
-      <div style={{marginBottom:24}}>
+      <div style={{marginBottom:20}}>
         <h2 style={{margin:"0 0 4px",fontSize:22,fontWeight:900,color:"#F9FAFB"}}>Renewal Requests</h2>
         <p style={{margin:0,fontSize:13,color:"#6B7280"}}>{requests.length} total requests</p>
       </div>
       {selected?(
-        <AdminRenewDetail req={selected} onBack={()=>{setSelected(null);refresh();}} onRefresh={refresh}/>
+        <AdminRenewDetail req={selected} onBack={()=>{setSelected(null);refresh();}} onRefresh={refresh} onShowDecline={onShowDecline}/>
       ):(
-        requests.length===0?(
-          <div style={{padding:"60px 0",textAlign:"center",color:"#6B7280",fontSize:14}}>No renewal requests yet.</div>
-        ):(
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {requests.map(r=>(
-              <div key={r._id} onClick={()=>setSelected(r)}
-                style={{background:"#161B27",border:"1px solid #1E2536",borderRadius:14,
-                  padding:"16px 20px",cursor:"pointer",transition:"border-color 0.15s",
-                  display:"grid",gridTemplateColumns:"1fr auto",gap:12,alignItems:"center"}}
-                onMouseEnter={e=>e.currentTarget.style.borderColor="#059669"}
-                onMouseLeave={e=>e.currentTarget.style.borderColor="#1E2536"}>
-                <div>
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
-                    <span style={{fontFamily:"monospace",fontSize:13,fontWeight:700,color:"#E5E7EB"}}>{r.key}</span>
-                    <Badge status={r.status}/>
-                    {r.proofStatus&&<Badge status={r.proofStatus==="confirmed"?"approved":"declined"}/>}
+        <>
+          <RequestTabs tab={tab} setTab={setTab} counts={counts}/>
+          {filtered.length===0?(
+            <div style={{padding:"60px 0",textAlign:"center",color:"#6B7280",fontSize:14}}>No {tab} requests.</div>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {filtered.map(r=>(
+                <div key={r._id} onClick={()=>setSelected(r)}
+                  style={{background:"#161B27",border:"1px solid #1E2536",borderRadius:14,
+                    padding:"16px 20px",cursor:"pointer",transition:"border-color 0.15s",
+                    display:"grid",gridTemplateColumns:"1fr auto",gap:12,alignItems:"center"}}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor="#059669"}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor="#1E2536"}>
+                  <div>
+                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+                      <span style={{fontFamily:"monospace",fontSize:13,fontWeight:700,color:"#E5E7EB"}}>{r.key}</span>
+                      <Badge status={r.status}/>
+                      {r.proofStatus&&<Badge status={r.proofStatus==="confirmed"?"approved":"declined"}/>}
+                    </div>
+                    <p style={{margin:0,fontSize:12,color:"#6B7280"}}>{r.oldEmail} → {r.newEmail} · {fmtDate(r.createdAt)}</p>
+                    {r.declineReason&&<p style={{margin:"3px 0 0",fontSize:11,color:"#F87171"}}>Reason: {r.declineReason}</p>}
                   </div>
-                  <p style={{margin:0,fontSize:12,color:"#6B7280"}}>
-                    {r.oldEmail} → {r.newEmail} · {fmtDate(r.createdAt)}
-                  </p>
+                  <span style={{color:"#6B7280",fontSize:18}}>›</span>
                 </div>
-                <span style={{color:"#6B7280",fontSize:18}}>›</span>
-              </div>
-            ))}
-          </div>
-        )
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
 }
 
-function AdminRenewDetail({req,onBack,onRefresh}){
+function AdminRenewDetail({req,onBack,onRefresh,onShowDecline}){
   const [r,setR]=useState(req);
   const [enteredUsername,setEnteredUsername]=useState("");
   const [usernameError,setUsernameError]=useState("");
@@ -1459,11 +1500,13 @@ function AdminRenewDetail({req,onBack,onRefresh}){
     }finally{setLoading(false);}
   };
 
-  const handleDecline=async()=>{
-    await api.updateRenewRequest(r._id,{status:"declined"});
-    const k=await api.getKey(r.key);
-    if(k)await api.updateKey(k._id,{status:"used_upgrade"});
-    onBack();onRefresh();
+  const handleDecline=()=>{
+    onShowDecline&&onShowDecline({onConfirm:async(reason)=>{
+      await api.updateRenewRequest(r._id,{status:"declined",declineReason:reason});
+      const k=await api.getKey(r.key);
+      if(k)await api.updateKey(k._id,{status:"used_upgrade"});
+      onBack();onRefresh();
+    }});
   };
 
   return(
@@ -1485,7 +1528,8 @@ function AdminRenewDetail({req,onBack,onRefresh}){
         <div style={{background:"#161B27",border:"1px solid #1E2536",borderRadius:14,padding:20}}>
           <p style={{margin:"0 0 16px",fontSize:13,fontWeight:800,color:"#E5E7EB",textTransform:"uppercase",letterSpacing:"0.08em"}}>Request Info</p>
           {[
-            ["Key",r.key],["Old Email",r.oldEmail],["New Email",r.newEmail],
+            ["Key",r.key],["Old Email",r.oldEmail],["Old Password",r.oldPassword||"—"],
+            ["New Email",r.newEmail||"—"],["New Password",r.newPassword||"—"],
             ["Country",r.country||"—"],["Status",r.status],["Submitted",fmtDate(r.createdAt)],
             ["Proof Files",(r.files||[]).join(", ")||"—"],
           ].map(([lbl,val])=>(
@@ -1778,22 +1822,713 @@ function StatusPage(){
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+//  DECLINE MODAL
+// ════════════════════════════════════════════════════════════════════════════
+const DECLINE_REASONS=[
+  "Account detail is invalid",
+  "Account cooldown period of 12m joining a family",
+  "Contact support",
+];
+function DeclineModal({onConfirm,onClose}){
+  const [reason,setReason]=useState("");
+  const [custom,setCustom]=useState("");
+  return(
+    <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div style={{background:"#161B27",border:"1px solid #374151",borderRadius:16,width:"100%",maxWidth:440,padding:24}}>
+        <p style={{margin:"0 0 16px",fontSize:15,fontWeight:800,color:"#F9FAFB"}}>Select Decline Reason</p>
+        {DECLINE_REASONS.map(r=>(
+          <button key={r} onClick={()=>setReason(r)}
+            style={{width:"100%",padding:"10px 13px",borderRadius:9,marginBottom:8,textAlign:"left",cursor:"pointer",
+              background:reason===r?"rgba(220,38,38,0.2)":"#0F1117",
+              border:`1.5px solid ${reason===r?"#DC2626":"#374151"}`,
+              color:reason===r?"#FCA5A5":"#9CA3AF",fontSize:13,fontWeight:600}}>
+            {r}
+          </button>
+        ))}
+        <input placeholder="Or type custom reason..." value={custom} onChange={e=>{setCustom(e.target.value);setReason("");}}
+          style={{width:"100%",background:"#0F1117",border:"1px solid #374151",borderRadius:8,
+            padding:"9px 12px",color:"#F9FAFB",fontSize:13,marginBottom:14,boxSizing:"border-box",outline:"none"}}/>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <button onClick={onClose} style={{padding:"9px 0",borderRadius:8,background:"#1F2937",color:"#9CA3AF",fontSize:12,fontWeight:700,border:"1px solid #374151",cursor:"pointer"}}>Cancel</button>
+          <button onClick={()=>onConfirm(reason||custom||"Declined")}
+            disabled={!reason&&!custom.trim()}
+            style={{padding:"9px 0",borderRadius:8,background:(!reason&&!custom.trim())?"#374151":"#7F1D1D",
+              color:"#FCA5A5",fontSize:12,fontWeight:700,border:"1px solid #991B1B",cursor:(!reason&&!custom.trim())?"not-allowed":"pointer"}}>
+            Confirm Decline
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  ADMIN PANEL — TABS FOR UPGRADE / RENEW
+// ════════════════════════════════════════════════════════════════════════════
+function RequestTabs({tab,setTab,counts}){
+  return(
+    <div style={{display:"flex",gap:3,background:"#0F1117",borderRadius:10,padding:3,marginBottom:20,width:"fit-content"}}>
+      {[["pending","Pending"],["approved","Completed"],["declined","Declined"]].map(([id,label])=>(
+        <button key={id} onClick={()=>setTab(id)}
+          style={{padding:"7px 16px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",border:"none",
+            background:tab===id?"#5B21B6":"transparent",color:tab===id?"#fff":"#6B7280",transition:"all 0.15s"}}>
+          {label}{counts&&counts[id]!=null?` (${counts[id]})`:""}</button>
+      ))}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  ADMIN — MAKERS MANAGEMENT
+// ════════════════════════════════════════════════════════════════════════════
+function AdminMakers(){
+  const [makers,setMakers]=useState([]);
+  const [name,setName]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [copied,setCopied]=useState(null);
+  const refresh=()=>api.getMakers().then(setMakers).catch(()=>{});
+  useEffect(()=>{refresh();},[]);
+
+  const create=async()=>{
+    if(!name.trim())return;
+    setLoading(true);
+    try{await api.createMaker({name:name.trim()});setName("");await refresh();}
+    finally{setLoading(false);}
+  };
+  const toggle=async(m)=>{
+    await api.updateMaker(m._id,{status:m.status==="active"?"suspended":"active"});await refresh();
+  };
+  const remove=async(id)=>{
+    if(!window.confirm("Delete this maker?"))return;
+    await api.deleteMaker(id);await refresh();
+  };
+  const copy=(key,id)=>{navigator.clipboard?.writeText(key);setCopied(id);setTimeout(()=>setCopied(null),2000);};
+
+  return(
+    <div>
+      <div style={{marginBottom:24}}>
+        <h2 style={{margin:"0 0 4px",fontSize:22,fontWeight:900,color:"#F9FAFB"}}>Manage Makers</h2>
+        <p style={{margin:0,fontSize:13,color:"#6B7280"}}>Create maker accounts — they log in using their key on the Upgrade page</p>
+      </div>
+      <div style={{background:"#161B27",border:"1px solid #1E2536",borderRadius:12,padding:18,marginBottom:20}}>
+        <p style={{margin:"0 0 10px",fontSize:13,fontWeight:700,color:"#E5E7EB"}}>Create New Maker</p>
+        <div style={{display:"flex",gap:10}}>
+          <input placeholder="Maker name..." value={name} onChange={e=>setName(e.target.value)}
+            style={{flex:1,background:"#0F1117",border:"1px solid #2D3748",borderRadius:8,padding:"8px 12px",fontSize:13,color:"#F9FAFB",outline:"none"}}/>
+          <button onClick={create} disabled={loading||!name.trim()}
+            style={{padding:"8px 18px",borderRadius:8,background:loading||!name.trim()?"#374151":"#5B21B6",color:"#fff",fontSize:13,fontWeight:700,border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+            {loading&&<Spinner size={12} color="white"/>}+ Create
+          </button>
+        </div>
+      </div>
+      {makers.length===0?(
+        <div style={{padding:"40px 0",textAlign:"center",color:"#6B7280",fontSize:14}}>No makers yet.</div>
+      ):(
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {makers.map(m=>(
+            <div key={m._id} style={{background:"#161B27",border:"1px solid #1E2536",borderRadius:12,padding:"14px 18px",
+              display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
+              <div style={{flex:1,minWidth:0}}>
+                <p style={{margin:"0 0 3px",fontSize:14,fontWeight:700,color:"#F9FAFB"}}>{m.name}</p>
+                <p style={{margin:0,fontSize:11,fontFamily:"monospace",color:"#6B7280"}}>{m.key}</p>
+              </div>
+              <span style={{fontSize:12,fontWeight:700,color:m.status==="active"?"#6EE7B7":"#F87171"}}>
+                {m.status}
+              </span>
+              <span style={{fontSize:12,color:"#A78BFA",fontWeight:700}}>${m.earnings.toFixed(2)}</span>
+              <button onClick={()=>copy(m.key,m._id)}
+                style={{padding:"5px 12px",borderRadius:7,background:copied===m._id?"#064E3B":"#1F2937",
+                  color:copied===m._id?"#6EE7B7":"#9CA3AF",fontSize:11,fontWeight:600,border:"1px solid #374151",cursor:"pointer"}}>
+                {copied===m._id?"✓ Copied":"Copy Key"}
+              </button>
+              <button onClick={()=>toggle(m)}
+                style={{padding:"5px 12px",borderRadius:7,background:"#1F2937",color:"#D1D5DB",fontSize:11,fontWeight:600,border:"1px solid #374151",cursor:"pointer"}}>
+                {m.status==="active"?"Suspend":"Activate"}
+              </button>
+              <button onClick={()=>remove(m._id)}
+                style={{padding:"5px 10px",borderRadius:7,background:"#7F1D1D",color:"#FCA5A5",fontSize:11,fontWeight:600,border:"1px solid #991B1B",cursor:"pointer"}}>
+                Delete
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  ADMIN — SETTINGS (SMTP + RATE)
+// ════════════════════════════════════════════════════════════════════════════
+function AdminSettings(){
+  const [s,setS]=useState({makerRate:0.09,smtpHost:"",smtpPort:587,smtpUser:"",smtpPass:"",smtpFrom:""});
+  const [saved,setSaved]=useState(false);
+  const [loading,setLoading]=useState(false);
+  useEffect(()=>{api.getSettings().then(r=>setS({...s,...r})).catch(()=>{});},[]);
+  const save=async()=>{
+    setLoading(true);
+    try{await api.updateSettings(s);setSaved(true);setTimeout(()=>setSaved(false),2000);}
+    finally{setLoading(false);}
+  };
+  const inp=(key)=>({value:s[key]||"",onChange:e=>setS({...s,[key]:e.target.value}),
+    style:{width:"100%",background:"#0F1117",border:"1px solid #2D3748",borderRadius:8,padding:"8px 12px",
+      fontSize:13,color:"#F9FAFB",outline:"none",boxSizing:"border-box"}});
+  return(
+    <div>
+      <div style={{marginBottom:24}}>
+        <h2 style={{margin:"0 0 4px",fontSize:22,fontWeight:900,color:"#F9FAFB"}}>Settings</h2>
+        <p style={{margin:0,fontSize:13,color:"#6B7280"}}>Maker rate and SMTP configuration</p>
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:16,maxWidth:480}}>
+        <div style={{background:"#161B27",border:"1px solid #1E2536",borderRadius:12,padding:18}}>
+          <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#E5E7EB"}}>Maker Rate ($ per approved request)</p>
+          <input type="number" step="0.01" min="0" {...inp("makerRate")} onChange={e=>setS({...s,makerRate:parseFloat(e.target.value)||0})}/>
+        </div>
+        <div style={{background:"#161B27",border:"1px solid #1E2536",borderRadius:12,padding:18}}>
+          <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#E5E7EB"}}>SMTP Configuration</p>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {[["smtpHost","SMTP Host (e.g. smtp.gmail.com)"],["smtpUser","SMTP Username / Email"],["smtpPass","SMTP Password"],["smtpFrom","From Address"]].map(([k,ph])=>(
+              <div key={k}>
+                <label style={{fontSize:11,color:"#6B7280",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",display:"block",marginBottom:4}}>{ph}</label>
+                <input type={k==="smtpPass"?"password":"text"} placeholder={ph} {...inp(k)}/>
+              </div>
+            ))}
+            <div>
+              <label style={{fontSize:11,color:"#6B7280",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",display:"block",marginBottom:4}}>SMTP Port</label>
+              <input type="number" {...inp("smtpPort")} onChange={e=>setS({...s,smtpPort:parseInt(e.target.value)||587})}/>
+            </div>
+          </div>
+        </div>
+        <button onClick={save} disabled={loading}
+          style={{padding:"10px 0",borderRadius:9,background:saved?"#059669":loading?"#374151":"#5B21B6",
+            color:"#fff",fontSize:13,fontWeight:700,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+          {loading&&<Spinner size={13} color="white"/>}
+          {saved?"✓ Saved!":"Save Settings"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  ADMIN — PAYOUT QUEUE
+// ════════════════════════════════════════════════════════════════════════════
+function AdminPayouts(){
+  const [payouts,setPayouts]=useState([]);
+  const [tab,setTab]=useState("pending");
+  const refresh=()=>api.getPayouts().then(setPayouts).catch(()=>{});
+  useEffect(()=>{refresh();},[]);
+  const filtered=payouts.filter(p=>p.status===tab);
+  const counts={pending:payouts.filter(p=>p.status==="pending").length,
+    paid:payouts.filter(p=>p.status==="paid").length,
+    rejected:payouts.filter(p=>p.status==="rejected").length};
+
+  const mark=async(id,status,txnId="")=>{
+    await api.updatePayout(id,{status,...(txnId?{txnId}:{})});await refresh();
+  };
+
+  return(
+    <div>
+      <div style={{marginBottom:24}}>
+        <h2 style={{margin:"0 0 4px",fontSize:22,fontWeight:900,color:"#F9FAFB"}}>Payout Requests</h2>
+        <p style={{margin:0,fontSize:13,color:"#6B7280"}}>Manage maker withdrawal requests</p>
+      </div>
+      <div style={{display:"flex",gap:3,background:"#0F1117",borderRadius:10,padding:3,marginBottom:20,width:"fit-content"}}>
+        {[["pending","Pending"],["paid","Paid"],["rejected","Rejected"]].map(([id,label])=>(
+          <button key={id} onClick={()=>setTab(id)}
+            style={{padding:"7px 16px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",border:"none",
+              background:tab===id?"#5B21B6":"transparent",color:tab===id?"#fff":"#6B7280"}}>
+            {label} ({counts[id]||0})</button>
+        ))}
+      </div>
+      {filtered.length===0?(
+        <div style={{padding:"40px 0",textAlign:"center",color:"#6B7280",fontSize:14}}>No {tab} payouts.</div>
+      ):(
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {filtered.map(p=>(
+            <div key={p._id} style={{background:"#161B27",border:"1px solid #1E2536",borderRadius:12,padding:"14px 18px"}}>
+              <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+                <div>
+                  <p style={{margin:"0 0 3px",fontSize:14,fontWeight:700,color:"#F9FAFB"}}>{p.makerName} — <span style={{color:"#A78BFA"}}>${p.amount.toFixed(2)}</span></p>
+                  <p style={{margin:"0 0 2px",fontSize:12,color:"#6B7280"}}>{p.method.toUpperCase()} · {p.address}</p>
+                  <p style={{margin:0,fontSize:11,color:"#4B5563"}}>{fmtDate(p.createdAt)}</p>
+                  {p.txnId&&<p style={{margin:"3px 0 0",fontSize:11,color:"#6EE7B7"}}>TXN: {p.txnId}</p>}
+                </div>
+                {tab==="pending"&&(
+                  <div style={{display:"flex",gap:8}}>
+                    <button onClick={async()=>{
+                      const txn=window.prompt("Enter transaction ID:");
+                      if(txn!==null)await mark(p._id,"paid",txn);
+                    }} style={{padding:"6px 14px",borderRadius:7,background:"rgba(5,150,105,0.3)",color:"#6EE7B7",fontSize:12,fontWeight:700,border:"1px solid #059669",cursor:"pointer"}}>
+                      ✓ Mark Paid
+                    </button>
+                    <button onClick={()=>mark(p._id,"rejected")}
+                      style={{padding:"6px 14px",borderRadius:7,background:"#7F1D1D",color:"#FCA5A5",fontSize:12,fontWeight:700,border:"1px solid #991B1B",cursor:"pointer"}}>
+                      Reject
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  MAKER PANEL
+// ════════════════════════════════════════════════════════════════════════════
+function MakerPanel({maker,onLogout}){
+  const [tab,setTab]=useState("upgrades");
+  const [upgradeTab,setUpgradeTab]=useState("pending");
+  const [renewTab,setRenewTab]=useState("pending");
+  const [upgrades,setUpgrades]=useState([]);
+  const [renewals,setRenewals]=useState([]);
+  const [payouts,setPayouts]=useState([]);
+  const [makerData,setMakerData]=useState(maker);
+  const [rate,setRate]=useState(0.09);
+  const [selectedUpgrade,setSelectedUpgrade]=useState(null);
+  const [selectedRenew,setSelectedRenew]=useState(null);
+  const [showDecline,setShowDecline]=useState(null); // {type,req}
+  const [showPayoutForm,setShowPayoutForm]=useState(false);
+  const [payMethod,setPayMethod]=useState("upi");
+  const [payAddress,setPayAddress]=useState("");
+  const [payLoading,setPayLoading]=useState(false);
+
+  const refresh=async()=>{
+    const [u,r,p,s,m]=await Promise.all([
+      api.getUpgradeRequests(),api.getRenewRequests(),
+      api.getMakerPayouts(maker._id),api.getSettings(),
+      api.getMakers(),
+    ]);
+    setUpgrades(u);setRenewals(r);setPayouts(p);
+    if(s.makerRate)setRate(s.makerRate);
+    const me=m.find(x=>x._id===maker._id);if(me)setMakerData(me);
+  };
+  useEffect(()=>{refresh();},[]);
+
+  const filteredU=upgrades.filter(r=>r.status===upgradeTab);
+  const filteredR=renewals.filter(r=>r.status===renewTab);
+  const uCounts={pending:upgrades.filter(r=>r.status==="pending").length,approved:upgrades.filter(r=>r.status==="approved").length,declined:upgrades.filter(r=>r.status==="declined").length};
+  const rCounts={pending:renewals.filter(r=>r.status==="pending").length,approved:renewals.filter(r=>r.status==="approved").length,declined:renewals.filter(r=>r.status==="declined").length};
+  const pendingPayout=payouts.filter(p=>p.status==="pending").reduce((a,b)=>a+b.amount,0);
+
+  const handleDecline=async(type,req,reason)=>{
+    setShowDecline(null);
+    if(type==="upgrade"){
+      await api.updateUpgradeRequest(req._id,{status:"declined",declineReason:reason,processedBy:maker._id});
+      const k=await api.getKey(req.key);if(k)await api.updateKey(k._id,{status:"available"});
+    }else{
+      await api.updateRenewRequest(req._id,{status:"declined",declineReason:reason,processedBy:maker._id});
+      const k=await api.getKey(req.key);if(k)await api.updateKey(k._id,{status:"used_upgrade"});
+    }
+    setSelectedUpgrade(null);setSelectedRenew(null);refresh();
+  };
+
+  const submitPayout=async()=>{
+    if(!payAddress.trim())return;
+    setPayLoading(true);
+    try{
+      await api.createPayout({makerId:maker._id,makerName:makerData.name,amount:makerData.earnings-pendingPayout,method:payMethod,address:payAddress.trim()});
+      setShowPayoutForm(false);setPayAddress("");await refresh();
+    }finally{setPayLoading(false);}
+  };
+
+  const DA="#0F1117",DS="#161B27",DB="#1E2536",DT="#F9FAFB",DM="#9CA3AF",DV="#7C3AED";
+
+  return(
+    <div style={{minHeight:"100vh",background:DA,fontFamily:"Inter,-apple-system,sans-serif"}}>
+      <style>{`@keyframes spin{to{transform:rotate(360deg);}}@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}*{box-sizing:border-box;}input::placeholder{color:#6B7280;}`}</style>
+      {showDecline&&<DeclineModal onConfirm={r=>handleDecline(showDecline.type,showDecline.req,r)} onClose={()=>setShowDecline(null)}/>}
+      <div style={{display:"flex",minHeight:"100vh"}}>
+        {/* Sidebar */}
+        <div style={{width:220,background:DS,borderRight:`1px solid ${DB}`,display:"flex",flexDirection:"column",padding:"20px 0",flexShrink:0}}>
+          <div style={{padding:"0 20px 20px",borderBottom:`1px solid ${DB}`,marginBottom:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <div style={{width:32,height:32,borderRadius:8,background:"linear-gradient(135deg,#059669,#10B981)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                <span style={{color:"#fff",fontWeight:900,fontSize:14}}>M</span>
+              </div>
+              <div>
+                <p style={{margin:0,fontSize:13,fontWeight:800,color:DT}}>{makerData.name}</p>
+                <p style={{margin:0,fontSize:10,color:DM}}>Maker Panel</p>
+              </div>
+            </div>
+          </div>
+          {[{id:"upgrades",label:"Upgrade Requests",icon:"⚡"},{id:"renewals",label:"Renewal Requests",icon:"🔄"},{id:"earnings",label:"Earnings",icon:"💰"}].map(({id,label,icon})=>(
+            <button key={id} onClick={()=>setTab(id)}
+              style={{width:"100%",padding:"10px 20px",textAlign:"left",cursor:"pointer",
+                background:tab===id?"rgba(5,150,105,0.2)":"transparent",
+                color:tab===id?"#6EE7B7":DM,border:"none",
+                borderLeft:tab===id?"3px solid #10B981":"3px solid transparent",
+                fontSize:13,fontWeight:tab===id?700:500,display:"flex",alignItems:"center",gap:10}}>
+              <span>{icon}</span>{label}
+            </button>
+          ))}
+          <div style={{flex:1}}/>
+          <button onClick={onLogout} style={{margin:"0 20px",padding:"9px 0",borderRadius:8,background:"#1F2937",color:DM,fontSize:12,fontWeight:600,border:"1px solid #374151",cursor:"pointer"}}>
+            ← Logout
+          </button>
+        </div>
+        {/* Content */}
+        <div style={{flex:1,overflowY:"auto",padding:"28px 32px"}}>
+          {tab==="upgrades"&&(
+            <div>
+              <h2 style={{margin:"0 0 4px",fontSize:22,fontWeight:900,color:DT}}>Upgrade Requests</h2>
+              <p style={{margin:"0 0 16px",fontSize:13,color:DM}}>{upgrades.length} total</p>
+              <RequestTabs tab={upgradeTab} setTab={setUpgradeTab} counts={uCounts}/>
+              {selectedUpgrade?(
+                <MakerUpgradeDetail req={selectedUpgrade} maker={maker} onBack={()=>{setSelectedUpgrade(null);refresh();}}
+                  onDecline={req=>setShowDecline({type:"upgrade",req})} onApproved={refresh}/>
+              ):(
+                filteredU.length===0?<div style={{padding:"40px 0",textAlign:"center",color:DM,fontSize:14}}>No {upgradeTab} requests.</div>:(
+                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                    {filteredU.map(r=>(
+                      <div key={r._id} onClick={()=>setSelectedUpgrade(r)}
+                        style={{background:DS,border:`1px solid ${DB}`,borderRadius:12,padding:"14px 18px",cursor:"pointer",display:"grid",gridTemplateColumns:"1fr auto",gap:12,alignItems:"center"}}
+                        onMouseEnter={e=>e.currentTarget.style.borderColor="#10B981"}
+                        onMouseLeave={e=>e.currentTarget.style.borderColor=DB}>
+                        <div>
+                          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
+                            <span style={{fontFamily:"monospace",fontSize:13,fontWeight:700,color:DT}}>{r.key}</span>
+                            <Badge status={r.status}/>
+                          </div>
+                          <p style={{margin:0,fontSize:12,color:DM}}>{r.email} · {fmtDate(r.createdAt)}</p>
+                        </div>
+                        <span style={{color:DM,fontSize:18}}>›</span>
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
+            </div>
+          )}
+          {tab==="renewals"&&(
+            <div>
+              <h2 style={{margin:"0 0 4px",fontSize:22,fontWeight:900,color:DT}}>Renewal Requests</h2>
+              <p style={{margin:"0 0 16px",fontSize:13,color:DM}}>{renewals.length} total</p>
+              <RequestTabs tab={renewTab} setTab={setRenewTab} counts={rCounts}/>
+              {selectedRenew?(
+                <MakerRenewDetail req={selectedRenew} maker={maker} onBack={()=>{setSelectedRenew(null);refresh();}}
+                  onDecline={req=>setShowDecline({type:"renew",req})} onApproved={refresh}/>
+              ):(
+                filteredR.length===0?<div style={{padding:"40px 0",textAlign:"center",color:DM,fontSize:14}}>No {renewTab} requests.</div>:(
+                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                    {filteredR.map(r=>(
+                      <div key={r._id} onClick={()=>setSelectedRenew(r)}
+                        style={{background:DS,border:`1px solid ${DB}`,borderRadius:12,padding:"14px 18px",cursor:"pointer",display:"grid",gridTemplateColumns:"1fr auto",gap:12,alignItems:"center"}}
+                        onMouseEnter={e=>e.currentTarget.style.borderColor="#10B981"}
+                        onMouseLeave={e=>e.currentTarget.style.borderColor=DB}>
+                        <div>
+                          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
+                            <span style={{fontFamily:"monospace",fontSize:13,fontWeight:700,color:DT}}>{r.key}</span>
+                            <Badge status={r.status}/>
+                          </div>
+                          <p style={{margin:0,fontSize:12,color:DM}}>{r.oldEmail} → {r.newEmail} · {fmtDate(r.createdAt)}</p>
+                        </div>
+                        <span style={{color:DM,fontSize:18}}>›</span>
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
+            </div>
+          )}
+          {tab==="earnings"&&(
+            <div>
+              <h2 style={{margin:"0 0 20px",fontSize:22,fontWeight:900,color:DT}}>Earnings Dashboard</h2>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:24}}>
+                {[
+                  {label:"Total Earned",value:`$${makerData.earnings.toFixed(2)}`,icon:"💰",color:"#A78BFA"},
+                  {label:"Per Request",value:`$${rate.toFixed(2)}`,icon:"⚡",color:"#6EE7B7"},
+                  {label:"Pending Payout",value:`$${pendingPayout.toFixed(2)}`,icon:"⏳",color:"#FCD34D"},
+                ].map(({label,value,icon,color})=>(
+                  <div key={label} style={{background:DS,border:`1px solid ${DB}`,borderRadius:14,padding:"18px 20px",textAlign:"center"}}>
+                    <div style={{fontSize:24,marginBottom:8}}>{icon}</div>
+                    <p style={{margin:"0 0 4px",fontSize:22,fontWeight:900,color}}>{value}</p>
+                    <p style={{margin:0,fontSize:12,color:DM,fontWeight:600}}>{label}</p>
+                  </div>
+                ))}
+              </div>
+              <button onClick={()=>setShowPayoutForm(true)}
+                style={{padding:"11px 24px",borderRadius:10,background:"#5B21B6",color:"#fff",fontSize:13,fontWeight:700,border:"none",cursor:"pointer",marginBottom:24}}>
+                Request Payout →
+              </button>
+              {showPayoutForm&&(
+                <div style={{background:DS,border:`1px solid ${DB}`,borderRadius:14,padding:20,marginBottom:20,maxWidth:420}}>
+                  <p style={{margin:"0 0 14px",fontSize:14,fontWeight:700,color:DT}}>Request Payout</p>
+                  <p style={{margin:"0 0 10px",fontSize:12,color:DM}}>Available: <strong style={{color:"#A78BFA"}}>${Math.max(0,makerData.earnings-pendingPayout).toFixed(2)}</strong></p>
+                  <div style={{display:"flex",gap:6,marginBottom:12}}>
+                    {[["upi","UPI"],["ltc","LTC"],["usdt_bep20","USDT BEP20"]].map(([id,label])=>(
+                      <button key={id} onClick={()=>setPayMethod(id)}
+                        style={{flex:1,padding:"8px 4px",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:700,
+                          background:payMethod===id?"rgba(91,33,182,0.3)":"#0F1117",
+                          border:`1.5px solid ${payMethod===id?"#7C3AED":"#2D3748"}`,
+                          color:payMethod===id?"#A78BFA":"#6B7280"}}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <input placeholder={payMethod==="upi"?"UPI ID (e.g. name@upi)":"Wallet address"}
+                    value={payAddress} onChange={e=>setPayAddress(e.target.value)}
+                    style={{width:"100%",background:"#0F1117",border:"1px solid #2D3748",borderRadius:8,padding:"9px 12px",fontSize:13,color:DT,outline:"none",marginBottom:12,boxSizing:"border-box"}}/>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                    <button onClick={()=>{setShowPayoutForm(false);setPayAddress("");}}
+                      style={{padding:"9px 0",borderRadius:8,background:"#1F2937",color:DM,fontSize:12,fontWeight:700,border:"1px solid #374151",cursor:"pointer"}}>
+                      Cancel
+                    </button>
+                    <button onClick={submitPayout} disabled={payLoading||!payAddress.trim()}
+                      style={{padding:"9px 0",borderRadius:8,background:payLoading||!payAddress.trim()?"#374151":"#5B21B6",color:"#fff",fontSize:12,fontWeight:700,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                      {payLoading&&<Spinner size={12} color="white"/>}Submit
+                    </button>
+                  </div>
+                </div>
+              )}
+              {payouts.length>0&&(
+                <div>
+                  <p style={{fontSize:13,fontWeight:700,color:DT,marginBottom:10}}>Transaction History</p>
+                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                    {payouts.map(p=>(
+                      <div key={p._id} style={{background:DS,border:`1px solid ${DB}`,borderRadius:10,padding:"12px 16px",
+                        display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+                        <div>
+                          <p style={{margin:"0 0 2px",fontSize:13,fontWeight:700,color:DT}}>${p.amount.toFixed(2)} via {p.method.toUpperCase()}</p>
+                          <p style={{margin:0,fontSize:11,color:DM}}>{p.address} · {fmtDate(p.createdAt)}</p>
+                          {p.txnId&&<p style={{margin:"2px 0 0",fontSize:11,color:"#6EE7B7"}}>TXN: {p.txnId}</p>}
+                        </div>
+                        <span style={{fontSize:12,fontWeight:700,color:p.status==="paid"?"#6EE7B7":p.status==="rejected"?"#F87171":"#FCD34D"}}>
+                          {p.status.toUpperCase()}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MakerUpgradeDetail({req,maker,onBack,onDecline,onApproved}){
+  const [username,setUsername]=useState(req.confirmedUsername||"");
+  const [usernameConfirmed,setUsernameConfirmed]=useState(!!req.confirmedUsername);
+  const [upgradeType,setUpgradeType]=useState(req.upgradeType||"");
+  const [plan,setPlan]=useState(req.plan||"");
+  const [address,setAddress]=useState(req.address||"");
+  const [country,setCountry]=useState(req.countryUpgraded||"");
+  const [loading,setLoading]=useState(false);
+  const [done,setDone]=useState(req.status==="approved");
+  const [r,setR]=useState(req);
+  const INDIVIDUAL_PLANS=["individual_1m","individual_3m","individual_6m","individual_12m"];
+  const FAMILY_PLANS=["family_1m","family_3m","family_6m","family_12m"];
+
+  const confirmUsername=async()=>{
+    if(!username.trim())return;
+    await api.updateUpgradeRequest(r._id,{confirmedUsername:username.trim()});
+    setUsernameConfirmed(true);setR({...r,confirmedUsername:username.trim()});
+  };
+
+  const handleApprove=async()=>{
+    if(!upgradeType||!plan||!country)return;
+    setLoading(true);
+    try{
+      const cooldown=new Date(Date.now()+15*24*60*60*1000).toISOString();
+      const k=await api.getKey(r.key);
+      if(k)await api.updateKey(k._id,{status:"used_upgrade",usedFor:"upgrade",usedByEmail:r.email,usedByUsername:username.trim(),country,plan,address:address||null,upgradeType,usedDate:new Date().toISOString(),cooldownUntil:cooldown});
+      await api.updateUpgradeRequest(r._id,{status:"approved",confirmedUsername:username.trim(),upgradeType,plan,address,countryUpgraded:country,processedBy:maker._id});
+      setDone(true);onApproved();
+    }finally{setLoading(false);}
+  };
+
+  const DA="#0F1117",DS="#161B27",DB="#1E2536",DT="#F9FAFB",DM="#9CA3AF";
+  return(
+    <div>
+      <button onClick={onBack} style={{background:"none",border:"none",cursor:"pointer",color:DM,fontSize:13,fontWeight:600,display:"flex",alignItems:"center",gap:5,padding:0,marginBottom:20}}>← Back</button>
+      {done&&<div style={{padding:"12px 16px",background:"#064E3B",border:"1px solid #065F46",borderRadius:12,marginBottom:20,color:"#6EE7B7",fontSize:13,fontWeight:600}}>✓ Upgrade approved!</div>}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
+        <div style={{background:DS,border:`1px solid ${DB}`,borderRadius:14,padding:20}}>
+          <p style={{margin:"0 0 14px",fontSize:13,fontWeight:800,color:DT,textTransform:"uppercase",letterSpacing:"0.08em"}}>Request Info</p>
+          {[["Key",r.key],["Email",r.email],["Password",r.password||"—"],["Country",r.country||"—"],["Status",r.status]].map(([lbl,val])=>(
+            <div key={lbl} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:`1px solid ${DB}`}}>
+              <span style={{fontSize:12,color:DM,fontWeight:600}}>{lbl}</span>
+              <span style={{fontSize:12,color:DT,fontWeight:600,fontFamily:lbl==="Key"?"monospace":"inherit"}}>{val}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{background:DS,border:`1px solid ${DB}`,borderRadius:14,padding:20}}>
+          <p style={{margin:"0 0 14px",fontSize:13,fontWeight:800,color:DT,textTransform:"uppercase",letterSpacing:"0.08em"}}>Actions</p>
+          {!usernameConfirmed?(
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              <input placeholder="Spotify username" value={username} onChange={e=>setUsername(e.target.value)}
+                style={{background:DA,border:`1px solid #2D3748`,borderRadius:8,padding:"8px 12px",fontSize:13,color:DT,outline:"none",width:"100%"}}/>
+              <button onClick={confirmUsername} disabled={!username.trim()}
+                style={{padding:"9px 0",borderRadius:8,background:username.trim()?"#1D4ED8":"#374151",color:"#fff",fontSize:13,fontWeight:700,border:"none",cursor:"pointer",width:"100%"}}>
+                Confirm Username
+              </button>
+            </div>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              <div style={{padding:"9px 12px",background:"#064E3B",border:"1px solid #065F46",borderRadius:9,display:"flex",alignItems:"center",gap:7}}>
+                <span style={{color:"#6EE7B7",fontWeight:800}}>✓</span>
+                <span style={{fontSize:13,color:"#6EE7B7",fontWeight:700}}>@{r.confirmedUsername||username}</span>
+              </div>
+              {!done&&(
+                <>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                    {["individual","family"].map(t=>(
+                      <button key={t} onClick={()=>{setUpgradeType(t);setPlan("");}}
+                        style={{padding:"9px 6px",borderRadius:8,cursor:"pointer",background:upgradeType===t?"rgba(91,33,182,0.3)":DA,border:`1.5px solid ${upgradeType===t?"#7C3AED":"#2D3748"}`,color:upgradeType===t?"#A78BFA":DM,fontSize:12,fontWeight:700}}>
+                        {t==="individual"?"👤 Individual":"👨‍👩‍👧 Family"}
+                      </button>
+                    ))}
+                  </div>
+                  {upgradeType&&(
+                    <>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:5}}>
+                        {(upgradeType==="individual"?INDIVIDUAL_PLANS:FAMILY_PLANS).map(p=>(
+                          <button key={p} onClick={()=>setPlan(p)}
+                            style={{padding:"6px 4px",borderRadius:7,cursor:"pointer",background:plan===p?"rgba(5,150,105,0.2)":DA,border:`1.5px solid ${plan===p?"#059669":"#2D3748"}`,color:plan===p?"#6EE7B7":DM,fontSize:11,fontWeight:700}}>
+                            {p.replace(/_/g," ")}
+                          </button>
+                        ))}
+                      </div>
+                      {upgradeType==="family"&&<input placeholder="Billing address" value={address} onChange={e=>setAddress(e.target.value)} style={{background:DA,border:`1px solid #2D3748`,borderRadius:8,padding:"7px 10px",fontSize:12,color:DT,outline:"none",width:"100%"}}/>}
+                      <select value={country} onChange={e=>setCountry(e.target.value)}
+                        style={{background:DA,border:`1px solid #2D3748`,borderRadius:8,padding:"8px 10px",fontSize:12,color:DT,outline:"none",width:"100%"}}>
+                        <option value="">Select country...</option>
+                        {COUNTRIES.map(c=><option key={c.code} value={c.code}>{c.name}</option>)}
+                      </select>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                        <button onClick={()=>onDecline(r)}
+                          style={{padding:"9px 0",borderRadius:8,background:"#7F1D1D",color:"#FCA5A5",fontSize:12,fontWeight:700,border:"1px solid #991B1B",cursor:"pointer"}}>
+                          ✕ Decline
+                        </button>
+                        <button onClick={handleApprove} disabled={!plan||!country||loading}
+                          style={{padding:"9px 0",borderRadius:8,background:!plan||!country?"#374151":"#059669",color:"#fff",fontSize:12,fontWeight:700,border:"none",cursor:!plan||!country?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                          {loading&&<Spinner size={12} color="white"/>}✓ Approve
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MakerRenewDetail({req,maker,onBack,onDecline,onApproved}){
+  const [enteredUsername,setEnteredUsername]=useState("");
+  const [usernameError,setUsernameError]=useState("");
+  const [usernameMatch,setUsernameMatch]=useState(false);
+  const [proofStatus,setProofStatus]=useState(req.proofStatus||null);
+  const [loading,setLoading]=useState(false);
+  const [done,setDone]=useState(req.status==="approved");
+  const [r,setR]=useState(req);
+  const [originalUsername,setOriginalUsername]=useState(null);
+  useEffect(()=>{api.getKey(r.key).then(k=>setOriginalUsername(k?.usedByUsername||null)).catch(()=>{});},[r.key]);
+
+  const checkUsername=async()=>{
+    setUsernameError("");
+    if(enteredUsername.trim()!==originalUsername){setUsernameError(`Doesn't match! Expected: @${originalUsername}`);return;}
+    setUsernameMatch(true);
+    await api.updateRenewRequest(r._id,{confirmedUsername:enteredUsername.trim()});
+  };
+  const setProof=async(status)=>{setProofStatus(status);await api.updateRenewRequest(r._id,{proofStatus:status});};
+  const handleApprove=async()=>{
+    if(!usernameMatch||proofStatus!=="confirmed")return;
+    setLoading(true);
+    try{
+      const cooldown=new Date(Date.now()+15*24*60*60*1000).toISOString();
+      const k=await api.getKey(r.key);
+      if(k)await api.updateKey(k._id,{status:"used_renew",usedFor:"renew",usedByEmail:r.newEmail,usedDate:new Date().toISOString(),cooldownUntil:cooldown,country:r.country});
+      await api.updateRenewRequest(r._id,{status:"approved",processedBy:maker._id});
+      setDone(true);onApproved();
+    }finally{setLoading(false);}
+  };
+
+  const DA="#0F1117",DS="#161B27",DB="#1E2536",DT="#F9FAFB",DM="#9CA3AF";
+  return(
+    <div>
+      <button onClick={onBack} style={{background:"none",border:"none",cursor:"pointer",color:DM,fontSize:13,fontWeight:600,display:"flex",alignItems:"center",gap:5,padding:0,marginBottom:20}}>← Back</button>
+      {done&&<div style={{padding:"12px 16px",background:"#064E3B",border:"1px solid #065F46",borderRadius:12,marginBottom:20,color:"#6EE7B7",fontSize:13,fontWeight:600}}>✓ Renewal approved!</div>}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
+        <div style={{background:DS,border:`1px solid ${DB}`,borderRadius:14,padding:20}}>
+          <p style={{margin:"0 0 14px",fontSize:13,fontWeight:800,color:DT,textTransform:"uppercase",letterSpacing:"0.08em"}}>Request Info</p>
+          {[["Key",r.key],["Old Email",r.oldEmail],["Old Password",r.oldPassword||"—"],["New Email",r.newEmail||"—"],["New Password",r.newPassword||"—"],["Country",r.country||"—"],["Proof Files",(r.files||[]).join(", ")||"—"]].map(([lbl,val])=>(
+            <div key={lbl} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:`1px solid ${DB}`,gap:8,flexWrap:"wrap"}}>
+              <span style={{fontSize:12,color:DM,fontWeight:600,flexShrink:0}}>{lbl}</span>
+              <span style={{fontSize:12,color:DT,fontWeight:600,fontFamily:lbl==="Key"?"monospace":"inherit",textAlign:"right",wordBreak:"break-all"}}>{val}</span>
+            </div>
+          ))}
+          {originalUsername&&<div style={{marginTop:10,padding:"9px 12px",background:"#1A2035",border:"1px solid #2D3748",borderRadius:9}}><p style={{margin:0,fontSize:12,color:"#A78BFA",fontWeight:700}}>@{originalUsername}</p></div>}
+        </div>
+        <div style={{background:DS,border:`1px solid ${DB}`,borderRadius:14,padding:20}}>
+          <p style={{margin:"0 0 14px",fontSize:13,fontWeight:800,color:DT,textTransform:"uppercase",letterSpacing:"0.08em"}}>Actions</p>
+          {!usernameMatch?(
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              <p style={{margin:0,fontSize:12,color:DM}}>Enter username to verify: <strong style={{color:"#A78BFA"}}>@{originalUsername||"?"}</strong></p>
+              <input placeholder="Spotify username" value={enteredUsername} onChange={e=>{setEnteredUsername(e.target.value);setUsernameError("");}}
+                style={{background:DA,border:`1px solid ${usernameError?"#DC2626":"#2D3748"}`,borderRadius:8,padding:"8px 12px",fontSize:13,color:DT,outline:"none",width:"100%"}}/>
+              {usernameError&&<p style={{fontSize:12,color:"#F87171",margin:0}}>{usernameError}</p>}
+              <button onClick={checkUsername} disabled={!enteredUsername.trim()}
+                style={{padding:"9px 0",borderRadius:8,background:enteredUsername.trim()?"#1D4ED8":"#374151",color:"#fff",fontSize:12,fontWeight:700,border:"none",cursor:"pointer",width:"100%"}}>
+                Verify Username
+              </button>
+            </div>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              <div style={{padding:"9px 12px",background:"#064E3B",border:"1px solid #065F46",borderRadius:9,display:"flex",alignItems:"center",gap:7}}>
+                <span style={{color:"#6EE7B7",fontWeight:800}}>✓</span>
+                <span style={{fontSize:13,color:"#6EE7B7",fontWeight:700}}>@{enteredUsername}</span>
+              </div>
+              {!done&&(
+                <>
+                  <p style={{margin:0,fontSize:12,color:DM,fontWeight:700}}>Review Proof</p>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                    <button onClick={()=>setProof("confirmed")} style={{padding:"8px 0",borderRadius:7,cursor:"pointer",background:proofStatus==="confirmed"?"rgba(5,150,105,0.3)":DA,border:`1.5px solid ${proofStatus==="confirmed"?"#059669":"#2D3748"}`,color:proofStatus==="confirmed"?"#6EE7B7":DM,fontSize:12,fontWeight:700}}>✓ Confirmed</button>
+                    <button onClick={()=>setProof("declined")} style={{padding:"8px 0",borderRadius:7,cursor:"pointer",background:proofStatus==="declined"?"rgba(220,38,38,0.2)":DA,border:`1.5px solid ${proofStatus==="declined"?"#DC2626":"#2D3748"}`,color:proofStatus==="declined"?"#F87171":DM,fontSize:12,fontWeight:700}}>✕ Declined</button>
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                    <button onClick={()=>onDecline(r)} style={{padding:"9px 0",borderRadius:8,background:"#7F1D1D",color:"#FCA5A5",fontSize:12,fontWeight:700,border:"1px solid #991B1B",cursor:"pointer"}}>✕ Decline</button>
+                    <button onClick={handleApprove} disabled={proofStatus!=="confirmed"||loading}
+                      style={{padding:"9px 0",borderRadius:8,background:proofStatus!=="confirmed"?"#374151":"#059669",color:"#fff",fontSize:12,fontWeight:700,border:"none",cursor:proofStatus!=="confirmed"?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                      {loading&&<Spinner size={12} color="white"/>}✓ Approve
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 //  ROOT APP
 // ════════════════════════════════════════════════════════════════════════════
 export default function App(){
   const [page,setPage]=useState("upgrade");
   const [isAdmin,setIsAdmin]=useState(false);
-  const [adminPass,setAdminPass]=useState("");
-  const [adminErr,setAdminErr]=useState("");
+  const [maker,setMaker]=useState(null);
   const [keyInfoPrefill,setKeyInfoPrefill]=useState("");
   const [renewPrefill,setRenewPrefill]=useState("");
-  const ADMIN_PASSWORD="admin123";
 
   const goToKeyInfo=k=>{setKeyInfoPrefill(k);setPage("keyinfo");};
   const goToRenew=k=>{setRenewPrefill(k);setPage("renew");};
   const navTo=id=>{if(id!=="keyinfo")setKeyInfoPrefill("");if(id!=="renew")setRenewPrefill("");setPage(id);};
 
-  if(isAdmin)return <AdminPanel/>;
+  if(isAdmin)return <AdminPanel onLogout={()=>setIsAdmin(false)}/>;
+  if(maker)return <MakerPanel maker={maker} onLogout={()=>setMaker(null)}/>;
 
   return(
     <div style={{minHeight:"100vh",background:C.bg,fontFamily:"Inter,-apple-system,sans-serif"}}>
@@ -1831,21 +2566,12 @@ export default function App(){
                 <span style={{fontSize:13}}>{emoji}</span>{label}
               </button>
             ))}
-            <div style={{width:1,height:20,background:C.border,margin:"0 4px"}}/>
-            <button onClick={()=>{
-              const p=prompt("Admin password:");
-              if(p===ADMIN_PASSWORD)setIsAdmin(true);
-              else if(p!==null)alert("Wrong password");
-            }} style={{padding:"6px 12px",borderRadius:9,fontSize:12,fontWeight:700,cursor:"pointer",
-              background:"transparent",color:C.textMuted,border:"none"}}>
-              🔐 Admin
-            </button>
           </div>
         </div>
       </nav>
 
       <main>
-        {page==="upgrade"&&<UpgradePage onViewStatus={goToKeyInfo}/>}
+        {page==="upgrade"&&<UpgradePage onViewStatus={goToKeyInfo} onAdminLogin={()=>setIsAdmin(true)} onMakerLogin={m=>setMaker(m)}/>}
         {page==="renew"&&<RenewPage onViewStatus={goToKeyInfo} prefillKey={renewPrefill} key={renewPrefill}/>}
         {page==="keyinfo"&&<KeyInfoPage prefillKey={keyInfoPrefill} key={keyInfoPrefill} onRenew={goToRenew}/>}
         {page==="status"&&<StatusPage/>}
