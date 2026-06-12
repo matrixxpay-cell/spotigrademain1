@@ -2145,6 +2145,7 @@ function AdminRenewDetail({req,onBack,onRefresh,onShowDecline}){
   const [address,setAddress]=useState(req.address||"");
   const [renewCountry,setRenewCountry]=useState(req.countryUpgraded||"");
 
+  const [newUsername,setNewUsername]=useState(req.newUsername||"");
   const [originalUsername,setOriginalUsername]=useState(null);
   useEffect(()=>{
     api.getKey(r.key).then(k=>setOriginalUsername(k?.usedByUsername||null)).catch(()=>{});
@@ -2178,14 +2179,15 @@ function AdminRenewDetail({req,onBack,onRefresh,onShowDecline}){
       if(k){
         await api.updateKey(k._id,{
           status:"used_renew",usedFor:"renew",
-          usedByEmail:r.newEmail,
+          usedByEmail:r.newEmail||r.oldEmail,
+          usedByUsername:newUsername.trim()||k.usedByUsername,
           usedDate:new Date().toISOString(),
           cooldownUntil:cooldown,
           country:renewCountry||r.country,
           plan,upgradeType,address:address||null,
         });
       }
-      await api.updateRenewRequest(r._id,{status:"approved",upgradeType,plan,address,countryUpgraded:renewCountry,processedBy:"admin"});
+      await api.updateRenewRequest(r._id,{status:"approved",upgradeType,plan,address,countryUpgraded:renewCountry,processedBy:"admin",newUsername:newUsername.trim()||undefined});
       setDone(true);onRefresh();
     }finally{setLoading(false);}
   };
@@ -2287,11 +2289,19 @@ function AdminRenewDetail({req,onBack,onRefresh,onShowDecline}){
                 </div>
               </>
             ):(
-              <div style={{padding:"10px 12px",background:"#064E3B",border:"1px solid #065F46",
-                borderRadius:10,display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-                <span style={{color:"#6EE7B7",fontWeight:800,fontSize:14}}>✓</span>
-                <span style={{fontSize:13,color:"#6EE7B7",fontWeight:700}}>Username matches: @{enteredUsername}</span>
-              </div>
+              <>
+                <div style={{padding:"10px 12px",background:"#064E3B",border:"1px solid #065F46",
+                  borderRadius:10,display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+                  <span style={{color:"#6EE7B7",fontWeight:800,fontSize:14}}>✓</span>
+                  <span style={{fontSize:13,color:"#6EE7B7",fontWeight:700}}>Old username verified: @{enteredUsername}</span>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:4}}>
+                  <p style={{margin:0,fontSize:12,color:"#9CA3AF",fontWeight:600}}>New Spotify Username (after renewal)</p>
+                  <input placeholder="Enter new spotify_username" value={newUsername} onChange={e=>setNewUsername(e.target.value)}
+                    style={{background:"#0F1117",border:"1px solid #2D3748",borderRadius:8,padding:"8px 12px",
+                      fontSize:13,color:"#F9FAFB",outline:"none",width:"100%"}}/>
+                </div>
+              </>
             )}
           </div>
 
@@ -3325,6 +3335,7 @@ function MakerRenewDetail({req,maker,onBack,onDecline,onApproved}){
   const [plan,setPlan]=useState(req.plan||"");
   const [address,setAddress]=useState(req.address||"");
   const [renewCountry,setRenewCountry]=useState(req.countryUpgraded||"");
+  const [newUsername,setNewUsername]=useState(req.newUsername||"");
   useEffect(()=>{api.getKey(r.key).then(k=>setOriginalUsername(k?.usedByUsername||null)).catch(()=>{});},[r.key]);
 
   const checkUsername=async()=>{
@@ -3340,8 +3351,8 @@ function MakerRenewDetail({req,maker,onBack,onDecline,onApproved}){
     try{
       const cooldown=new Date(Date.now()+15*24*60*60*1000).toISOString();
       const k=await api.getKey(r.key);
-      if(k)await api.updateKey(k._id,{status:"used_renew",usedFor:"renew",usedByEmail:r.newEmail,usedDate:new Date().toISOString(),cooldownUntil:cooldown,country:renewCountry||r.country,plan,upgradeType,address:address||null});
-      await api.updateRenewRequest(r._id,{status:"approved",processedBy:maker._id,upgradeType,plan,address,countryUpgraded:renewCountry});
+      if(k)await api.updateKey(k._id,{status:"used_renew",usedFor:"renew",usedByEmail:r.newEmail||r.oldEmail,usedByUsername:newUsername.trim()||k?.usedByUsername,usedDate:new Date().toISOString(),cooldownUntil:cooldown,country:renewCountry||r.country,plan,upgradeType,address:address||null});
+      await api.updateRenewRequest(r._id,{status:"approved",processedBy:maker._id,upgradeType,plan,address,countryUpgraded:renewCountry,newUsername:newUsername.trim()||undefined});
       setDone(true);onApproved();
     }finally{setLoading(false);}
   };
@@ -3386,7 +3397,12 @@ function MakerRenewDetail({req,maker,onBack,onDecline,onApproved}){
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
               <div style={{padding:"9px 12px",background:"#064E3B",border:"1px solid #065F46",borderRadius:9,display:"flex",alignItems:"center",gap:7}}>
                 <span style={{color:"#6EE7B7",fontWeight:800}}>✓</span>
-                <span style={{fontSize:13,color:"#6EE7B7",fontWeight:700}}>@{enteredUsername}</span>
+                <span style={{fontSize:13,color:"#6EE7B7",fontWeight:700}}>Old username: @{enteredUsername}</span>
+              </div>
+              <div>
+                <p style={{margin:"0 0 5px",fontSize:12,color:DM,fontWeight:600}}>New Spotify Username (after renewal)</p>
+                <input placeholder="Enter new spotify_username" value={newUsername} onChange={e=>setNewUsername(e.target.value)}
+                  style={{background:DA,border:"1px solid #2D3748",borderRadius:8,padding:"8px 12px",fontSize:13,color:DT,outline:"none",width:"100%"}}/>
               </div>
               {!done&&(
                 <>

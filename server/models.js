@@ -44,6 +44,7 @@ const renewRequestSchema = new mongoose.Schema({
   status:            { type: String, default: "pending" },
   proofStatus:       { type: String, default: null },
   confirmedUsername: { type: String, default: null },
+  newUsername:       { type: String, default: null },
   adminNote:         { type: String, default: null },
   declineReason:     { type: String, default: null },
   processedBy:       { type: String, default: null }, // maker id
