@@ -1132,8 +1132,9 @@ function AdminKeys(){
         {keys.map(k=>{
           const isSel=selected.includes(k._id);
           const clLeft=cooldownLeft(k.cooldownUntil);
+          const hasCooldown=k.cooldownUntil&&new Date(k.cooldownUntil)>new Date();
           return(
-            <div key={k._id} style={{display:"grid",gridTemplateColumns:"36px 1fr 110px 120px 110px 80px",
+            <div key={k._id} style={{display:"grid",gridTemplateColumns:"36px 1fr 110px 120px 110px auto",
               padding:"11px 16px",borderBottom:"1px solid #1E2536",gap:10,alignItems:"center",
               background:isSel?"rgba(91,33,182,0.12)":"transparent",
               transition:"background 0.15s"}}>
@@ -1155,13 +1156,24 @@ function AdminKeys(){
                 <span style={{fontSize:11,color:"#9CA3AF"}}>{fmtDate(k.usedDate)}</span>
                 {clLeft&&<p style={{margin:"2px 0 0",fontSize:10,color:"#D97706"}}>⏳ {clLeft}</p>}
               </div>
-              <button onClick={()=>copyKey(k)}
-                style={{padding:"4px 10px",borderRadius:6,
-                  background:copied===k._id?"#065F46":"#1F2937",
-                  color:copied===k._id?"#6EE7B7":"#9CA3AF",
-                  fontSize:11,fontWeight:600,border:"1px solid #374151",cursor:"pointer"}}>
-                {copied===k._id?"✓":"Copy"}
-              </button>
+              <div style={{display:"flex",gap:5}}>
+                <button onClick={()=>copyKey(k)}
+                  style={{padding:"4px 10px",borderRadius:6,
+                    background:copied===k._id?"#065F46":"#1F2937",
+                    color:copied===k._id?"#6EE7B7":"#9CA3AF",
+                    fontSize:11,fontWeight:600,border:"1px solid #374151",cursor:"pointer"}}>
+                  {copied===k._id?"✓":"Copy"}
+                </button>
+                {hasCooldown&&(
+                  <button onClick={async()=>{
+                    await api.updateKey(k._id,{cooldownUntil:null});
+                    await refresh();
+                  }} style={{padding:"4px 10px",borderRadius:6,background:"#1C1917",
+                    color:"#FCD34D",fontSize:11,fontWeight:600,border:"1px solid #78350F",cursor:"pointer",whiteSpace:"nowrap"}}>
+                    ⏳ Clear CD
+                  </button>
+                )}
+              </div>
             </div>
           );
         })}
