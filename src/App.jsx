@@ -158,7 +158,7 @@ function Card({children,style={},onClick}){
   );
 }
 
-function Btn({children,onClick,disabled,loading,variant="primary",size="md",color,style:{}}={}){
+function Btn({children,onClick,disabled,loading,variant="primary",size="md",color}={}){
   const variants={
     primary:{bg:color||C.violet,c:"#fff",border:"none"},
     secondary:{bg:C.surface,c:C.textSub,border:`1px solid ${C.border}`},
