@@ -2018,6 +2018,14 @@ function AdminUpgradeDetail({req,onBack,onRefresh,onShowDecline}){
                       </div>
                     </>
                   )}
+                  {/* Always show decline even before upgrade type selected */}
+                  {!upgradeType&&(
+                    <button onClick={handleDecline}
+                      style={{padding:"10px 0",borderRadius:8,background:"#7F1D1D",color:"#FCA5A5",
+                        fontSize:12,fontWeight:700,border:"1px solid #991B1B",cursor:"pointer",width:"100%",marginTop:8}}>
+                      ✕ Decline Request
+                    </button>
+                  )}
                 </>
               )}
             </div>
@@ -2110,6 +2118,9 @@ function AdminRenewals({onShowDecline}){
   );
 }
 
+const RENEW_INDIVIDUAL_PLANS=["individual_1m","individual_3m","individual_6m","individual_12m"];
+const RENEW_FAMILY_PLANS=["family_1m","family_3m","family_6m","family_12m"];
+
 function AdminRenewDetail({req,onBack,onRefresh,onShowDecline}){
   const [r,setR]=useState(req);
   const [enteredUsername,setEnteredUsername]=useState("");
@@ -2119,6 +2130,10 @@ function AdminRenewDetail({req,onBack,onRefresh,onShowDecline}){
   const [loading,setLoading]=useState(false);
   const [done,setDone]=useState(req.status==="approved");
   const [makers,setMakers]=useState([]);
+  const [upgradeType,setUpgradeType]=useState(req.upgradeType||"");
+  const [plan,setPlan]=useState(req.plan||"");
+  const [address,setAddress]=useState(req.address||"");
+  const [renewCountry,setRenewCountry]=useState(req.countryUpgraded||"");
 
   const [originalUsername,setOriginalUsername]=useState(null);
   useEffect(()=>{
@@ -2156,10 +2171,11 @@ function AdminRenewDetail({req,onBack,onRefresh,onShowDecline}){
           usedByEmail:r.newEmail,
           usedDate:new Date().toISOString(),
           cooldownUntil:cooldown,
-          country:r.country,
+          country:renewCountry||r.country,
+          plan,upgradeType,address:address||null,
         });
       }
-      await api.updateRenewRequest(r._id,{status:"approved"});
+      await api.updateRenewRequest(r._id,{status:"approved",upgradeType,plan,address,countryUpgraded:renewCountry});
       setDone(true);onRefresh();
     }finally{setLoading(false);}
   };
@@ -2269,7 +2285,7 @@ function AdminRenewDetail({req,onBack,onRefresh,onShowDecline}){
                 <p style={{margin:"0 0 10px",fontSize:12,color:"#9CA3AF",fontWeight:700}}>Step 2: Review revoke proof</p>
                 <ProofViewer urls={r.files||[]} dark={true}/>
                 <div style={{marginBottom:10}}/>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:4}}>
                   <button onClick={()=>setProof("confirmed")}
                     style={{padding:"9px 0",borderRadius:8,cursor:"pointer",
                       background:proofStatus==="confirmed"?"rgba(5,150,105,0.3)":"#0F1117",
@@ -2287,6 +2303,55 @@ function AdminRenewDetail({req,onBack,onRefresh,onShowDecline}){
                 </div>
               </div>
 
+              {/* Step 3: Upgrade details (only after proof confirmed) */}
+              {proofStatus==="confirmed"&&(
+                <div style={{borderTop:"1px solid #1E2536",paddingTop:14,marginBottom:14,display:"flex",flexDirection:"column",gap:10}}>
+                  <p style={{margin:0,fontSize:12,color:"#9CA3AF",fontWeight:700}}>Step 3: Select renewal plan details</p>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                    {["individual","family"].map(t=>(
+                      <button key={t} onClick={()=>{setUpgradeType(t);setPlan("");}}
+                        style={{padding:"10px 8px",borderRadius:8,cursor:"pointer",textAlign:"center",
+                          background:upgradeType===t?"rgba(91,33,182,0.3)":"#0F1117",
+                          border:`1.5px solid ${upgradeType===t?"#7C3AED":"#2D3748"}`,
+                          color:upgradeType===t?"#A78BFA":"#9CA3AF",fontSize:12,fontWeight:700}}>
+                        {t==="individual"?"👤 Individual":"👨‍👩‍👧 Family/Platinum"}
+                      </button>
+                    ))}
+                  </div>
+                  {upgradeType&&(
+                    <>
+                      <p style={{margin:"2px 0",fontSize:12,color:"#9CA3AF",fontWeight:600}}>Select Plan & Duration</p>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                        {(upgradeType==="individual"?RENEW_INDIVIDUAL_PLANS:RENEW_FAMILY_PLANS).map(p=>(
+                          <button key={p} onClick={()=>setPlan(p)}
+                            style={{padding:"7px 6px",borderRadius:7,cursor:"pointer",
+                              background:plan===p?"rgba(5,150,105,0.25)":"#0F1117",
+                              border:`1.5px solid ${plan===p?C.green:"#2D3748"}`,
+                              color:plan===p?"#6EE7B7":"#9CA3AF",fontSize:11,fontWeight:700}}>
+                            {p.replace(/_/g," ")}
+                          </button>
+                        ))}
+                      </div>
+                      {upgradeType==="family"&&(
+                        <>
+                          <p style={{margin:"2px 0",fontSize:12,color:"#9CA3AF",fontWeight:600}}>Billing Address</p>
+                          <input placeholder="e.g. 123 Main St, New York, NY 10001" value={address} onChange={e=>setAddress(e.target.value)}
+                            style={{background:"#0F1117",border:"1px solid #2D3748",borderRadius:8,padding:"8px 12px",
+                              fontSize:12,color:"#F9FAFB",outline:"none",width:"100%"}}/>
+                        </>
+                      )}
+                      <p style={{margin:"2px 0",fontSize:12,color:"#9CA3AF",fontWeight:600}}>Country Used to Renew</p>
+                      <select value={renewCountry} onChange={e=>setRenewCountry(e.target.value)}
+                        style={{background:"#0F1117",border:"1px solid #2D3748",borderRadius:8,padding:"8px 12px",
+                          fontSize:12,color:"#F9FAFB",outline:"none",width:"100%"}}>
+                        <option value="">Select country...</option>
+                        {COUNTRIES.map(c=><option key={c.code} value={c.code}>{c.name}</option>)}
+                      </select>
+                    </>
+                  )}
+                </div>
+              )}
+
               {/* Final actions */}
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                 <button onClick={handleDecline}
@@ -2295,11 +2360,11 @@ function AdminRenewDetail({req,onBack,onRefresh,onShowDecline}){
                   ✕ Decline
                 </button>
                 <button onClick={handleApprove}
-                  disabled={proofStatus!=="confirmed"||loading}
+                  disabled={proofStatus!=="confirmed"||!plan||!renewCountry||loading}
                   style={{padding:"10px 0",borderRadius:8,
-                    background:proofStatus!=="confirmed"?"#374151":"#059669",
+                    background:(proofStatus!=="confirmed"||!plan||!renewCountry)?"#374151":"#059669",
                     color:"#fff",fontSize:12,fontWeight:700,border:"none",
-                    cursor:proofStatus!=="confirmed"?"not-allowed":"pointer",
+                    cursor:(proofStatus!=="confirmed"||!plan||!renewCountry)?"not-allowed":"pointer",
                     display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
                   {loading&&<Spinner size={12} color="white"/>}
                   ✓ Confirm Renewal
@@ -2512,7 +2577,7 @@ const DECLINE_REASONS=[
 function DeclineModal({onConfirm,onClose}){
   const [reason,setReason]=useState(null);
   const [custom,setCustom]=useState("");
-  const finalReason=custom.trim()||(reason?.label);
+  const finalReason=custom.trim()||(reason?`${reason.label}: ${reason.desc}`:null);
   return(
     <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.75)",backdropFilter:"blur(4px)",
       display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
@@ -3232,6 +3297,10 @@ function MakerRenewDetail({req,maker,onBack,onDecline,onApproved}){
   const [done,setDone]=useState(req.status==="approved");
   const [r,setR]=useState(req);
   const [originalUsername,setOriginalUsername]=useState(null);
+  const [upgradeType,setUpgradeType]=useState(req.upgradeType||"");
+  const [plan,setPlan]=useState(req.plan||"");
+  const [address,setAddress]=useState(req.address||"");
+  const [renewCountry,setRenewCountry]=useState(req.countryUpgraded||"");
   useEffect(()=>{api.getKey(r.key).then(k=>setOriginalUsername(k?.usedByUsername||null)).catch(()=>{});},[r.key]);
 
   const checkUsername=async()=>{
@@ -3242,13 +3311,13 @@ function MakerRenewDetail({req,maker,onBack,onDecline,onApproved}){
   };
   const setProof=async(status)=>{setProofStatus(status);await api.updateRenewRequest(r._id,{proofStatus:status});};
   const handleApprove=async()=>{
-    if(!usernameMatch||proofStatus!=="confirmed")return;
+    if(!usernameMatch||proofStatus!=="confirmed"||!plan||!renewCountry)return;
     setLoading(true);
     try{
       const cooldown=new Date(Date.now()+15*24*60*60*1000).toISOString();
       const k=await api.getKey(r.key);
-      if(k)await api.updateKey(k._id,{status:"used_renew",usedFor:"renew",usedByEmail:r.newEmail,usedDate:new Date().toISOString(),cooldownUntil:cooldown,country:r.country});
-      await api.updateRenewRequest(r._id,{status:"approved",processedBy:maker._id});
+      if(k)await api.updateKey(k._id,{status:"used_renew",usedFor:"renew",usedByEmail:r.newEmail,usedDate:new Date().toISOString(),cooldownUntil:cooldown,country:renewCountry||r.country,plan,upgradeType,address:address||null});
+      await api.updateRenewRequest(r._id,{status:"approved",processedBy:maker._id,upgradeType,plan,address,countryUpgraded:renewCountry});
       setDone(true);onApproved();
     }finally{setLoading(false);}
   };
@@ -3261,19 +3330,20 @@ function MakerRenewDetail({req,maker,onBack,onDecline,onApproved}){
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
         <div style={{background:DS,border:`1px solid ${DB}`,borderRadius:14,padding:20}}>
           <p style={{margin:"0 0 14px",fontSize:13,fontWeight:800,color:DT,textTransform:"uppercase",letterSpacing:"0.08em"}}>Request Info</p>
-          {[["Key",r.key],["Old Email",r.oldEmail],["Old Password",r.oldPassword||"—"],["New Email",r.newEmail||"—"],["New Password",r.newPassword||"—"],["Country",r.country||"—"],["Proof Files",(r.files||[]).join(", ")||"—"]].map(([lbl,val])=>(
+          {[["Key",r.key],["Old Email",r.oldEmail],["Old Password",r.oldPassword||"—"],["New Email",r.newEmail||"—"],["New Password",r.newPassword||"—"],["Country",r.country||"—"]].map(([lbl,val])=>(
             <div key={lbl} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:`1px solid ${DB}`,gap:8,flexWrap:"wrap"}}>
               <span style={{fontSize:12,color:DM,fontWeight:600,flexShrink:0}}>{lbl}</span>
               <span style={{fontSize:12,color:DT,fontWeight:600,fontFamily:lbl==="Key"?"monospace":"inherit",textAlign:"right",wordBreak:"break-all"}}>{val}</span>
             </div>
           ))}
-          {originalUsername&&<div style={{marginTop:10,padding:"9px 12px",background:"#1A2035",border:"1px solid #2D3748",borderRadius:9}}><p style={{margin:0,fontSize:12,color:"#A78BFA",fontWeight:700}}>@{originalUsername}</p></div>}
+          <div style={{padding:"8px 0"}}><span style={{fontSize:12,color:DM,fontWeight:600,display:"block",marginBottom:4}}>Proof Files</span><ProofViewer urls={r.files||[]} dark={true}/></div>
+          {originalUsername&&<div style={{marginTop:10,padding:"9px 12px",background:"#1A2035",border:"1px solid #2D3748",borderRadius:9}}><p style={{margin:0,fontSize:12,color:"#A78BFA",fontWeight:700}}>Original: @{originalUsername}</p></div>}
         </div>
         <div style={{background:DS,border:`1px solid ${DB}`,borderRadius:14,padding:20}}>
           <p style={{margin:"0 0 14px",fontSize:13,fontWeight:800,color:DT,textTransform:"uppercase",letterSpacing:"0.08em"}}>Actions</p>
           {!usernameMatch?(
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              <p style={{margin:0,fontSize:12,color:DM}}>Enter username to verify: <strong style={{color:"#A78BFA"}}>@{originalUsername||"?"}</strong></p>
+              <p style={{margin:0,fontSize:12,color:DM}}>Step 1: Verify username — <strong style={{color:"#A78BFA"}}>@{originalUsername||"?"}</strong></p>
               <input placeholder="Spotify username" value={enteredUsername} onChange={e=>{setEnteredUsername(e.target.value);setUsernameError("");}}
                 style={{background:DA,border:`1px solid ${usernameError?"#DC2626":"#2D3748"}`,borderRadius:8,padding:"8px 12px",fontSize:13,color:DT,outline:"none",width:"100%"}}/>
               {usernameError&&<p style={{fontSize:12,color:"#F87171",margin:0}}>{usernameError}</p>}
@@ -3281,6 +3351,7 @@ function MakerRenewDetail({req,maker,onBack,onDecline,onApproved}){
                 style={{padding:"9px 0",borderRadius:8,background:enteredUsername.trim()?"#1D4ED8":"#374151",color:"#fff",fontSize:12,fontWeight:700,border:"none",cursor:"pointer",width:"100%"}}>
                 Verify Username
               </button>
+              {usernameError&&<button onClick={()=>onDecline(r)} style={{padding:"9px 0",borderRadius:8,background:"#7F1D1D",color:"#FCA5A5",fontSize:12,fontWeight:700,border:"1px solid #991B1B",cursor:"pointer",width:"100%"}}>✕ Decline</button>}
             </div>
           ):(
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -3290,16 +3361,43 @@ function MakerRenewDetail({req,maker,onBack,onDecline,onApproved}){
               </div>
               {!done&&(
                 <>
-                  <p style={{margin:"0 0 6px",fontSize:12,color:DM,fontWeight:700}}>Review Proof</p>
+                  <p style={{margin:"0",fontSize:12,color:DM,fontWeight:700}}>Step 2: Review proof</p>
                   <ProofViewer urls={r.files||[]} dark={true}/>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginTop:8}}>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
                     <button onClick={()=>setProof("confirmed")} style={{padding:"8px 0",borderRadius:7,cursor:"pointer",background:proofStatus==="confirmed"?"rgba(5,150,105,0.3)":DA,border:`1.5px solid ${proofStatus==="confirmed"?"#059669":"#2D3748"}`,color:proofStatus==="confirmed"?"#6EE7B7":DM,fontSize:12,fontWeight:700}}>✓ Confirmed</button>
                     <button onClick={()=>setProof("declined")} style={{padding:"8px 0",borderRadius:7,cursor:"pointer",background:proofStatus==="declined"?"rgba(220,38,38,0.2)":DA,border:`1.5px solid ${proofStatus==="declined"?"#DC2626":"#2D3748"}`,color:proofStatus==="declined"?"#F87171":DM,fontSize:12,fontWeight:700}}>✕ Declined</button>
                   </div>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  {proofStatus==="confirmed"&&(
+                    <>
+                      <p style={{margin:"4px 0 0",fontSize:12,color:DM,fontWeight:700}}>Step 3: Plan details</p>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                        {["individual","family"].map(t=>(
+                          <button key={t} onClick={()=>{setUpgradeType(t);setPlan("");}}
+                            style={{padding:"8px 6px",borderRadius:7,cursor:"pointer",background:upgradeType===t?"rgba(91,33,182,0.3)":DA,border:`1.5px solid ${upgradeType===t?"#7C3AED":"#2D3748"}`,color:upgradeType===t?"#A78BFA":DM,fontSize:11,fontWeight:700}}>
+                            {t==="individual"?"👤 Individual":"👨‍👩‍👧 Family"}
+                          </button>
+                        ))}
+                      </div>
+                      {upgradeType&&(
+                        <>
+                          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:5}}>
+                            {(upgradeType==="individual"?RENEW_INDIVIDUAL_PLANS:RENEW_FAMILY_PLANS).map(p=>(
+                              <button key={p} onClick={()=>setPlan(p)} style={{padding:"6px 4px",borderRadius:6,cursor:"pointer",background:plan===p?"rgba(5,150,105,0.25)":DA,border:`1.5px solid ${plan===p?"#059669":"#2D3748"}`,color:plan===p?"#6EE7B7":DM,fontSize:10,fontWeight:700}}>{p.replace(/_/g," ")}</button>
+                            ))}
+                          </div>
+                          {upgradeType==="family"&&<input placeholder="Billing address" value={address} onChange={e=>setAddress(e.target.value)} style={{background:DA,border:"1px solid #2D3748",borderRadius:7,padding:"7px 10px",fontSize:12,color:DT,outline:"none",width:"100%"}}/>}
+                          <select value={renewCountry} onChange={e=>setRenewCountry(e.target.value)} style={{background:DA,border:"1px solid #2D3748",borderRadius:7,padding:"7px 10px",fontSize:12,color:DT,outline:"none",width:"100%"}}>
+                            <option value="">Select country...</option>
+                            {COUNTRIES.map(c=><option key={c.code} value={c.code}>{c.name}</option>)}
+                          </select>
+                        </>
+                      )}
+                    </>
+                  )}
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:4}}>
                     <button onClick={()=>onDecline(r)} style={{padding:"9px 0",borderRadius:8,background:"#7F1D1D",color:"#FCA5A5",fontSize:12,fontWeight:700,border:"1px solid #991B1B",cursor:"pointer"}}>✕ Decline</button>
-                    <button onClick={handleApprove} disabled={proofStatus!=="confirmed"||loading}
-                      style={{padding:"9px 0",borderRadius:8,background:proofStatus!=="confirmed"?"#374151":"#059669",color:"#fff",fontSize:12,fontWeight:700,border:"none",cursor:proofStatus!=="confirmed"?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                    <button onClick={handleApprove} disabled={proofStatus!=="confirmed"||!plan||!renewCountry||loading}
+                      style={{padding:"9px 0",borderRadius:8,background:(proofStatus!=="confirmed"||!plan||!renewCountry)?"#374151":"#059669",color:"#fff",fontSize:12,fontWeight:700,border:"none",cursor:(proofStatus!=="confirmed"||!plan||!renewCountry)?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
                       {loading&&<Spinner size={12} color="white"/>}✓ Approve
                     </button>
                   </div>
