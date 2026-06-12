@@ -81,6 +81,11 @@ bot.on("message", async (msg) => {
       }
       try {
         await bot.sendMessage(targetId, `🎧 *Support:* ${reply}`, { parse_mode: "Markdown" });
+        if (sessions[targetId]) {
+          if (!sessions[targetId].history) sessions[targetId].history = [];
+          sessions[targetId].history.push({ from: "agent", text: reply, time: new Date().toISOString() });
+          saveSessions(sessions);
+        }
         bot.sendMessage(AGENT_ID, `✓ Sent to ${sessions[targetId]?.firstName || targetId}`);
       } catch {
         bot.sendMessage(AGENT_ID, `⚠️ Could not deliver to ${targetId}`);
@@ -121,7 +126,7 @@ bot.on("message", async (msg) => {
   // ── Client: first message — assign agent ────────────────────────────────────
   if (!sessions[chatId]) {
     const agentName = randomName();
-    sessions[chatId] = { agentName, firstName };
+    sessions[chatId] = { agentName, firstName, history: [] };
     saveSessions(sessions);
     await bot.sendMessage(chatId,
       `✅ You are now connected with *${agentName}*\n\n_Please wait — our agent will respond shortly._`,
@@ -129,12 +134,28 @@ bot.on("message", async (msg) => {
     );
   }
 
-  // ── Forward to agent ────────────────────────────────────────────────────────
-  const { agentName } = sessions[chatId];
+  // Save message to history
+  if (!sessions[chatId].history) sessions[chatId].history = [];
+  sessions[chatId].history.push({ from: "client", text, time: new Date().toISOString() });
+  // Keep last 20 messages
+  if (sessions[chatId].history.length > 20) sessions[chatId].history = sessions[chatId].history.slice(-20);
+  saveSessions(sessions);
+
+  // ── Forward to agent with history ───────────────────────────────────────────
+  const { agentName, history } = sessions[chatId];
+
+  // Build history string (last 10 messages excluding current)
+  const prevMsgs = history.slice(0, -1).slice(-9);
+  const historyStr = prevMsgs.length > 0
+    ? "\n\n📜 *Chat History:*\n" + prevMsgs.map(m =>
+        `${m.from === "client" ? "👤" : "🎧"} ${m.text}`
+      ).join("\n")
+    : "";
+
   bot.sendMessage(AGENT_ID,
     `📩 *${firstName}* (ID: \`${chatId}\`)\n` +
-    `Agent: ${agentName}\n\n` +
-    `${text}\n\n` +
+    `Agent: ${agentName}${historyStr}\n\n` +
+    `💬 *New:* ${text}\n\n` +
     `→ \`/reply ${chatId} your message\`\n` +
     `→ \`/close ${chatId}\``,
     { parse_mode: "Markdown" }
