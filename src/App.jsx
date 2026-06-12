@@ -1744,11 +1744,17 @@ function AdminUpgrades({onShowDecline}){
   const [requests,setRequests]=useState([]);
   const [selected,setSelected]=useState(null);
   const [tab,setTab]=useState("pending");
+  const [search,setSearch]=useState("");
 
   const refresh=()=>api.getUpgradeRequests().then(setRequests).catch(()=>{});
   useEffect(()=>{refresh();},[]);
 
-  const filtered=requests.filter(r=>r.status===tab);
+  const filtered=requests.filter(r=>{
+    if(r.status!==tab)return false;
+    if(!search.trim())return true;
+    const q=search.toLowerCase();
+    return(r.key||"").toLowerCase().includes(q)||(r.email||"").toLowerCase().includes(q)||(r.confirmedUsername||"").toLowerCase().includes(q);
+  });
   const counts={pending:requests.filter(r=>r.status==="pending").length,approved:requests.filter(r=>r.status==="approved").length,declined:requests.filter(r=>r.status==="declined").length};
 
   return(
@@ -1762,8 +1768,11 @@ function AdminUpgrades({onShowDecline}){
       ):(
         <>
           <RequestTabs tab={tab} setTab={setTab} counts={counts}/>
+          <input placeholder="Search by key, email, username..." value={search} onChange={e=>setSearch(e.target.value)}
+            style={{width:"100%",background:"#0F1117",border:"1px solid #2D3748",borderRadius:9,
+              padding:"9px 13px",fontSize:13,color:"#F9FAFB",outline:"none",marginBottom:14,boxSizing:"border-box"}}/>
           {filtered.length===0?(
-            <div style={{padding:"60px 0",textAlign:"center",color:"#6B7280",fontSize:14}}>No {tab} requests.</div>
+            <div style={{padding:"60px 0",textAlign:"center",color:"#6B7280",fontSize:14}}>{search?`No results for "${search}".`:`No ${tab} requests.`}</div>
           ):(
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
               {filtered.map(r=>{
@@ -2024,10 +2033,16 @@ function AdminRenewals({onShowDecline}){
   const [requests,setRequests]=useState([]);
   const [selected,setSelected]=useState(null);
   const [tab,setTab]=useState("pending");
+  const [search,setSearch]=useState("");
   const refresh=()=>api.getRenewRequests().then(setRequests).catch(()=>{});
   useEffect(()=>{refresh();},[]);
 
-  const filtered=requests.filter(r=>r.status===tab);
+  const filtered=requests.filter(r=>{
+    if(r.status!==tab)return false;
+    if(!search.trim())return true;
+    const q=search.toLowerCase();
+    return(r.key||"").toLowerCase().includes(q)||(r.oldEmail||"").toLowerCase().includes(q)||(r.newEmail||"").toLowerCase().includes(q)||(r.confirmedUsername||"").toLowerCase().includes(q);
+  });
   const counts={pending:requests.filter(r=>r.status==="pending").length,approved:requests.filter(r=>r.status==="approved").length,declined:requests.filter(r=>r.status==="declined").length};
 
   return(
@@ -2041,8 +2056,11 @@ function AdminRenewals({onShowDecline}){
       ):(
         <>
           <RequestTabs tab={tab} setTab={setTab} counts={counts}/>
+          <input placeholder="Search by key, email, username..." value={search} onChange={e=>setSearch(e.target.value)}
+            style={{width:"100%",background:"#0F1117",border:"1px solid #2D3748",borderRadius:9,
+              padding:"9px 13px",fontSize:13,color:"#F9FAFB",outline:"none",marginBottom:14,boxSizing:"border-box"}}/>
           {filtered.length===0?(
-            <div style={{padding:"60px 0",textAlign:"center",color:"#6B7280",fontSize:14}}>No {tab} requests.</div>
+            <div style={{padding:"60px 0",textAlign:"center",color:"#6B7280",fontSize:14}}>{search?`No results for "${search}".`:`No ${tab} requests.`}</div>
           ):(
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
               {filtered.map(r=>{
