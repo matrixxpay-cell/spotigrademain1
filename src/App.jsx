@@ -48,6 +48,12 @@ const api = {
   updateSettings: (d) => fetch(`${API}/settings`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}).then(r=>r.json()),
   // AUTH
   checkKey: (k) => fetch(`${API}/auth/check-key/${encodeURIComponent(k)}`).then(r=>r.json()),
+  // UPLOAD
+  uploadFiles: (files) => {
+    const fd = new FormData();
+    files.forEach(f => fd.append("files", f));
+    return fetch(`${API}/upload`, { method:"POST", body:fd }).then(r=>r.json());
+  },
 };
 
 // ─── SHARED UI ────────────────────────────────────────────────────────────────
@@ -295,6 +301,38 @@ function CountrySelect({value,onChange,accentColor=C.violet}){
 }
 
 // ─── FILE UPLOAD ──────────────────────────────────────────────────────────────
+// ─── PROOF FILE VIEWER ────────────────────────────────────────────────────────
+function ProofViewer({urls=[],dark=false}){
+  const [lightbox,setLightbox]=useState(null);
+  if(!urls||urls.length===0)return<span style={{fontSize:12,color:dark?"#6B7280":C.textMuted}}>No files attached</span>;
+  const isVideo=u=>u.match(/\.(mp4|webm|mov)$/i);
+  const bg=dark?"#0F1117":C.surfaceAlt;
+  const border=dark?"#1E2536":C.border;
+  return(
+    <>
+      {lightbox!==null&&(
+        <div onClick={()=>setLightbox(null)} style={{position:"fixed",inset:0,zIndex:99999,background:"rgba(0,0,0,0.92)",display:"flex",alignItems:"center",justifyContent:"center",padding:20,cursor:"zoom-out"}}>
+          {isVideo(urls[lightbox])
+            ?<video src={urls[lightbox]} controls autoPlay style={{maxWidth:"90vw",maxHeight:"90vh",borderRadius:12}}/>
+            :<img src={urls[lightbox]} alt="proof" style={{maxWidth:"90vw",maxHeight:"90vh",borderRadius:12,objectFit:"contain"}}/>}
+          <button onClick={()=>setLightbox(null)} style={{position:"fixed",top:20,right:24,background:"none",border:"none",color:"#fff",fontSize:28,cursor:"pointer",lineHeight:1}}>✕</button>
+        </div>
+      )}
+      <div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:6}}>
+        {urls.map((u,i)=>(
+          <div key={i} onClick={()=>setLightbox(i)}
+            style={{width:80,height:80,borderRadius:8,border:`1px solid ${border}`,background:bg,
+              overflow:"hidden",cursor:"zoom-in",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
+            {isVideo(u)
+              ?<div style={{textAlign:"center",padding:4}}><div style={{fontSize:22}}>🎬</div><p style={{margin:0,fontSize:9,color:dark?"#9CA3AF":C.textMuted}}>Video</p></div>
+              :<img src={u} alt={`proof-${i}`} style={{width:"100%",height:"100%",objectFit:"cover"}}/>}
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
 function FileUpload({files,onChange,accept=".png,.jpg,.jpeg,.webp,.mp4"}){
   const ref=useRef();
   const remove=i=>{const n=[...files];n.splice(i,1);onChange(n);};
@@ -823,7 +861,12 @@ function RenewPage({onViewStatus,prefillKey=""}){
   const handleSubmit=async()=>{
     setLoading(true);
     try{
-      await api.createRenewRequest({key:key.trim(),oldEmail,oldPassword:oldPass,newEmail,newPassword:newPass,country,files:files.map(f=>f.name)});
+      let fileUrls=[];
+      if(files.length>0){
+        const up=await api.uploadFiles(files);
+        fileUrls=up.urls||[];
+      }
+      await api.createRenewRequest({key:key.trim(),oldEmail,oldPassword:oldPass,newEmail,newPassword:newPass,country,files:fileUrls});
       const k=await api.getKey(key.trim());
       if(k)await api.updateKey(k._id,{status:"processing"});
       setSubmitted(true);
@@ -1707,7 +1750,6 @@ function AdminRenewDetail({req,onBack,onRefresh,onShowDecline}){
             ["Key",r.key],["Old Email",r.oldEmail],["Old Password",r.oldPassword||"—"],
             ["New Email",r.newEmail||"—"],["New Password",r.newPassword||"—"],
             ["Country",r.country||"—"],["Status",r.status],["Submitted",fmtDate(r.createdAt)],
-            ["Proof Files",(r.files||[]).join(", ")||"—"],
           ].map(([lbl,val])=>(
             <div key={lbl} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",
               borderBottom:"1px solid #1E2536",gap:10,flexWrap:"wrap"}}>
@@ -1716,6 +1758,10 @@ function AdminRenewDetail({req,onBack,onRefresh,onShowDecline}){
                 fontFamily:lbl==="Key"?"monospace":"inherit",wordBreak:"break-all",textAlign:"right"}}>{val}</span>
             </div>
           ))}
+          <div style={{padding:"8px 0",borderBottom:"1px solid #1E2536"}}>
+            <span style={{fontSize:12,color:"#6B7280",fontWeight:600,display:"block",marginBottom:4}}>Proof Files</span>
+            <ProofViewer urls={r.files||[]} dark={true}/>
+          </div>
           {originalUsername&&(
             <div style={{marginTop:12,padding:"10px 12px",background:"#1A2035",border:"1px solid #2D3748",borderRadius:10}}>
               <p style={{margin:"0 0 2px",fontSize:10,color:"#6B7280",fontWeight:700,textTransform:"uppercase"}}>Original Upgrade Username</p>
@@ -1762,9 +1808,8 @@ function AdminRenewDetail({req,onBack,onRefresh,onShowDecline}){
             <>
               <div style={{borderTop:"1px solid #1E2536",paddingTop:14,marginBottom:14}}>
                 <p style={{margin:"0 0 10px",fontSize:12,color:"#9CA3AF",fontWeight:700}}>Step 2: Review revoke proof</p>
-                <p style={{margin:"0 0 10px",fontSize:12,color:"#6B7280"}}>
-                  Files: <span style={{color:"#E5E7EB"}}>{(r.files||[]).join(", ")||"none attached"}</span>
-                </p>
+                <ProofViewer urls={r.files||[]} dark={true}/>
+                <div style={{marginBottom:10}}/>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
                   <button onClick={()=>setProof("confirmed")}
                     style={{padding:"9px 0",borderRadius:8,cursor:"pointer",
@@ -2667,8 +2712,9 @@ function MakerRenewDetail({req,maker,onBack,onDecline,onApproved}){
               </div>
               {!done&&(
                 <>
-                  <p style={{margin:0,fontSize:12,color:DM,fontWeight:700}}>Review Proof</p>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                  <p style={{margin:"0 0 6px",fontSize:12,color:DM,fontWeight:700}}>Review Proof</p>
+                  <ProofViewer urls={r.files||[]} dark={true}/>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginTop:8}}>
                     <button onClick={()=>setProof("confirmed")} style={{padding:"8px 0",borderRadius:7,cursor:"pointer",background:proofStatus==="confirmed"?"rgba(5,150,105,0.3)":DA,border:`1.5px solid ${proofStatus==="confirmed"?"#059669":"#2D3748"}`,color:proofStatus==="confirmed"?"#6EE7B7":DM,fontSize:12,fontWeight:700}}>✓ Confirmed</button>
                     <button onClick={()=>setProof("declined")} style={{padding:"8px 0",borderRadius:7,cursor:"pointer",background:proofStatus==="declined"?"rgba(220,38,38,0.2)":DA,border:`1.5px solid ${proofStatus==="declined"?"#DC2626":"#2D3748"}`,color:proofStatus==="declined"?"#F87171":DM,fontSize:12,fontWeight:700}}>✕ Declined</button>
                   </div>

@@ -3,6 +3,8 @@ const express    = require("express");
 const mongoose   = require("mongoose");
 const cors       = require("cors");
 const path       = require("path");
+const fs         = require("fs");
+const multer     = require("multer");
 const nodemailer = require("nodemailer");
 const { Key, UpgradeRequest, RenewRequest, MakerKey, Payout, AppSettings } = require("./models");
 
@@ -12,7 +14,29 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-const DIST = path.join(__dirname, "../dist");
+const DIST    = path.join(__dirname, "../dist");
+const UPLOADS = path.join(__dirname, "uploads");
+if (!fs.existsSync(UPLOADS)) fs.mkdirSync(UPLOADS, { recursive: true });
+
+// Serve uploaded files
+app.use("/uploads", express.static(UPLOADS));
+
+// Multer config — store with original extension, max 50MB
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOADS),
+  filename:    (req, file, cb) => {
+    const ext  = path.extname(file.originalname);
+    const name = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
+    cb(null, name);
+  },
+});
+const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
+
+// Upload endpoint
+app.post("/api/upload", upload.array("files", 10), (req, res) => {
+  const urls = req.files.map(f => `/uploads/${f.filename}`);
+  res.json({ urls });
+});
 app.use(express.static(DIST));
 
 mongoose.connect(process.env.MONGO_URI)
