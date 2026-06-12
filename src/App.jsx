@@ -191,6 +191,22 @@ function InfoBox({type="info",children}){
   );
 }
 
+function ProcessingNotice(){
+  return(
+    <div style={{display:"flex",alignItems:"flex-start",gap:12,padding:"12px 16px",
+      background:"linear-gradient(135deg,#FFFBEB,#FFF7ED)",
+      border:`1px solid ${C.amberBorder}`,borderRadius:12,marginBottom:20}}>
+      <span style={{fontSize:18,flexShrink:0,marginTop:1}}>⏳</span>
+      <div>
+        <p style={{margin:"0 0 3px",fontSize:13,fontWeight:700,color:C.amberText}}>Processing times may vary — please be patient</p>
+        <p style={{margin:0,fontSize:12,color:C.amber,lineHeight:1.6}}>
+          Most requests are completed within <strong>5–10 minutes</strong>. During periods of high demand or limited maker availability, processing may take up to <strong>6–12 hours</strong>. We appreciate your patience and will fulfil your request as soon as possible.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function StepBar({step,total,labels,color=C.violet}){
   return(
     <div style={{marginBottom:24}}>
@@ -448,7 +464,8 @@ function KeyInfoPage({prefillKey="",onRenew}){
           Lookup System
         </span>
         <h1 style={{fontSize:26,fontWeight:900,color:C.text,margin:"0 0 6px",letterSpacing:"-0.03em"}}>Key Information</h1>
-        <p style={{color:C.textSub,fontSize:14,margin:0,lineHeight:1.6}}>Track upgrade status, verify your license key, or look up by Spotify username.</p>
+        <p style={{color:C.textSub,fontSize:14,margin:"0 0 16px",lineHeight:1.6}}>Track upgrade status, verify your license key, or look up by Spotify username.</p>
+        <ProcessingNotice/>
       </div>
 
       {/* Search */}
@@ -695,9 +712,10 @@ function ProcessingScreen({type,keyStr,onViewStatus,onBack}){
           <h3 style={{margin:"0 0 6px",fontSize:16,fontWeight:800,color:C.text}}>What's happening?</h3>
           <p style={{margin:"0 0 18px",fontSize:13,color:C.textSub,lineHeight:1.7}}>
             {type==="renew"
-              ?"Your renewal request has been submitted. We're revoking the old account and activating Premium. Usually takes 5–10 minutes."
-              :"Your upgrade request has been submitted. We're processing your account now. Usually takes 5–10 minutes."}
+              ?"Your renewal request has been submitted. Our team is revoking the old account and activating Premium."
+              :"Your upgrade request has been submitted. Our team is processing your Spotify account."}
           </p>
+          <ProcessingNotice/>
           <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:22}}>
             {steps.map((step,i)=>(
               <div key={i} style={{display:"flex",alignItems:"center",gap:10}}>
@@ -832,7 +850,8 @@ function UpgradePage({onViewStatus,onAdminLogin,onMakerLogin}){
         Automated System Online
       </span>
       <h1 style={{fontSize:26,fontWeight:900,color:C.text,margin:"0 0 6px",letterSpacing:"-0.03em"}}>Upgrade Your Account</h1>
-      <p style={{color:C.textSub,fontSize:14,margin:"0 0 24px",lineHeight:1.6}}>Follow the steps below to activate Spotify Premium instantly.</p>
+      <p style={{color:C.textSub,fontSize:14,margin:"0 0 16px",lineHeight:1.6}}>Follow the steps below to activate Spotify Premium instantly.</p>
+      <ProcessingNotice/>
 
       <Card style={{padding:26}}>
         <StepBar step={step} total={3} labels={labels}/>
@@ -995,8 +1014,8 @@ function RenewPage({onViewStatus,prefillKey=""}){
         Lifetime Guarantee Active
       </span>
       <h1 style={{fontSize:26,fontWeight:900,color:C.text,margin:"0 0 6px",letterSpacing:"-0.03em"}}>Renew Premium Access</h1>
-      <p style={{color:C.textSub,fontSize:14,margin:"0 0 24px",lineHeight:1.6}}>Restore your Premium — covered by your lifetime guarantee.</p>
-
+      <p style={{color:C.textSub,fontSize:14,margin:"0 0 16px",lineHeight:1.6}}>Restore your Premium — covered by your lifetime guarantee.</p>
+      <ProcessingNotice/>
       <Card style={{padding:26}}>
         <StepBar step={step>2?step-1:step} total={6} labels={labels} color={C.green}/>
 
