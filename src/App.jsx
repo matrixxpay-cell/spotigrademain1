@@ -1324,6 +1324,10 @@ function AdminKeyDetail({keyObj,onBack}){
 }
 
 // ─── Admin: Key Management ────────────────────────────────────────────────────
+const GEN_HISTORY_KEY = "sg_gen_history";
+function loadGenHistory(){ try{return JSON.parse(localStorage.getItem(GEN_HISTORY_KEY)||"[]");}catch{return[];} }
+function saveGenHistory(h){ try{localStorage.setItem(GEN_HISTORY_KEY,JSON.stringify(h));}catch{} }
+
 function AdminKeys(){
   const [keys,setKeys]=useState([]);
   const [selected,setSelected]=useState([]);
@@ -1331,6 +1335,8 @@ function AdminKeys(){
   const [genLoading,setGenLoading]=useState(false);
   const [copied,setCopied]=useState(null);
   const [detailKey,setDetailKey]=useState(null);
+  const [genHistory,setGenHistory]=useState(loadGenHistory); // [{date, keys:[]}]
+  const [historyOpen,setHistoryOpen]=useState(false);
 
   const refresh=()=>api.getKeys().then(setKeys).catch(()=>{});
   useEffect(()=>{refresh();},[]);
@@ -1339,7 +1345,20 @@ function AdminKeys(){
     const n=parseInt(genCount)||1;
     if(n<1||n>500)return;
     setGenLoading(true);
-    try{await api.generateKeys(n);await refresh();}finally{setGenLoading(false);}
+    try{
+      const before=await api.getKeys();
+      await api.generateKeys(n);
+      const after=await api.getKeys();
+      setKeys(after);
+      const beforeIds=new Set(before.map(k=>k._id));
+      const newKeys=after.filter(k=>!beforeIds.has(k._id)).map(k=>k.key);
+      if(newKeys.length>0){
+        const entry={date:new Date().toISOString(),count:newKeys.length,keys:newKeys};
+        const updated=[entry,...loadGenHistory()].slice(0,50); // keep last 50 batches
+        saveGenHistory(updated);
+        setGenHistory(updated);
+      }
+    }finally{setGenLoading(false);}
   };
 
   const deleteSelected=async()=>{
@@ -1385,8 +1404,57 @@ function AdminKeys(){
             {genLoading&&<Spinner size={13} color="white"/>}
             Generate Keys
           </button>
+          {genHistory.length>0&&(
+            <button onClick={()=>setHistoryOpen(h=>!h)}
+              style={{padding:"9px 16px",borderRadius:8,background:"#1E2536",color:"#A78BFA",
+                fontSize:13,fontWeight:700,border:"1px solid #312E81",cursor:"pointer",display:"flex",alignItems:"center",gap:7}}>
+              📦 Batch History ({genHistory.length})
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Batch History Panel */}
+      {historyOpen&&(
+        <div style={{background:"#0F1117",border:"1px solid #1E2536",borderRadius:14,padding:20,marginBottom:20}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+            <p style={{margin:0,fontSize:13,fontWeight:700,color:"#E5E7EB"}}>📦 Generation History</p>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>{saveGenHistory([]);setGenHistory([]);setHistoryOpen(false);}}
+                style={{padding:"5px 12px",borderRadius:7,background:"#7F1D1D",color:"#FCA5A5",fontSize:11,fontWeight:700,border:"1px solid #991B1B",cursor:"pointer"}}>
+                Clear History
+              </button>
+              <button onClick={()=>setHistoryOpen(false)}
+                style={{background:"none",border:"none",color:"#6B7280",cursor:"pointer",fontSize:18,lineHeight:1,padding:"0 4px"}}>✕</button>
+            </div>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:8,maxHeight:320,overflowY:"auto"}}>
+            {genHistory.map((batch,i)=>(
+              <div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+                padding:"10px 14px",borderRadius:10,background:"#161B27",border:"1px solid #1E2536"}}>
+                <div>
+                  <p style={{margin:"0 0 2px",fontSize:12,fontWeight:700,color:"#E5E7EB"}}>
+                    Batch {genHistory.length-i} — {batch.count} keys
+                  </p>
+                  <p style={{margin:0,fontSize:11,color:"#6B7280"}}>
+                    {new Date(batch.date).toLocaleString("en-US",{month:"short",day:"numeric",year:"numeric",hour:"2-digit",minute:"2-digit"})}
+                  </p>
+                </div>
+                <button onClick={()=>{
+                  const txt=batch.keys.join("\n");
+                  const a=document.createElement("a");
+                  a.href="data:text/plain;charset=utf-8,"+encodeURIComponent(txt);
+                  a.download=`keys-batch-${new Date(batch.date).toISOString().slice(0,10)}.txt`;
+                  a.click();
+                }} style={{padding:"6px 14px",borderRadius:8,background:"#064E3B",color:"#6EE7B7",
+                  fontSize:12,fontWeight:700,border:"1px solid #065F46",cursor:"pointer",flexShrink:0}}>
+                  ↓ Download
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Actions */}
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,flexWrap:"wrap"}}>
