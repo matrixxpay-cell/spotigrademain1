@@ -437,7 +437,7 @@ function KeyInfoPage({prefillKey="",onRenew}){
   const canRenew=data&&data.status==="used_upgrade"&&(!data.cooldownUntil||new Date(data.cooldownUntil)<=new Date());
 
   return(
-    <div style={{maxWidth:680,margin:"0 auto",padding:"32px 20px"}}>
+    <div style={{maxWidth:680,margin:"0 auto",padding:"32px 16px"}}>
       {/* Header */}
       <div style={{marginBottom:24}}>
         <span style={{display:"inline-flex",alignItems:"center",gap:6,padding:"4px 12px",borderRadius:999,
@@ -509,7 +509,7 @@ function KeyInfoPage({prefillKey="",onRenew}){
           )}
 
           {/* Main stat cards */}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,marginBottom:4}}>
+          <div className="stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,marginBottom:4}}>
             {[
               {label:"Spotify Username",value:data.usedByUsername||"—",icon:"👤",color:C.violet},
               {label:"Key Status",value:<Badge status={data.displayStatus}/>,icon:"🔑",color:C.blue},
@@ -638,8 +638,8 @@ function ProcessingScreen({type,keyStr,onViewStatus,onBack}){
   const accentColor=type==="renew"?C.green:C.violet;
   const fmt=d=>d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit",second:"2-digit"});
   return(
-    <div style={{maxWidth:860,margin:"0 auto",padding:"32px 20px"}}>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20,alignItems:"start"}}>
+    <div style={{maxWidth:860,margin:"0 auto",padding:"32px 16px"}}>
+      <div className="processing-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20,alignItems:"start"}}>
         {/* Left */}
         <Card style={{padding:28}}>
           <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:22}}>
@@ -781,7 +781,7 @@ function UpgradePage({onViewStatus,onAdminLogin,onMakerLogin}){
 
   const labels=["License Key","Account","Country"];
   return(
-    <div style={{maxWidth:540,margin:"0 auto",padding:"32px 20px"}}>
+    <div style={{maxWidth:540,margin:"0 auto",padding:"32px 16px"}}>
       <span style={{display:"inline-flex",alignItems:"center",gap:6,padding:"4px 12px",borderRadius:999,
         background:C.violetLight,color:C.violet,fontSize:11,fontWeight:700,
         border:`1px solid ${C.violet}30`,marginBottom:14}}>
@@ -846,7 +846,7 @@ function UpgradePage({onViewStatus,onAdminLogin,onMakerLogin}){
         )}
       </Card>
 
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginTop:14}}>
+      <div className="three-col" style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginTop:14}}>
         {[["🛡️","No Logs Kept"],["⚡","Instant Process"],["🔁","Free Renewals"]].map(([icon,label])=>(
           <div key={label} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:7,
             padding:"14px 8px",borderRadius:12,background:C.surface,border:`1px solid ${C.border}`,textAlign:"center"}}>
@@ -919,7 +919,7 @@ function RenewPage({onViewStatus,prefillKey=""}){
   const labels=["Key","Old Account","Verify","New Account","Proof","Country"];
 
   return(
-    <div style={{maxWidth:540,margin:"0 auto",padding:"32px 20px"}}>
+    <div style={{maxWidth:540,margin:"0 auto",padding:"32px 16px"}}>
       {showModal&&(
         <Modal title="Confirm Your Account" onClose={()=>setShowModal(false)} width={420}>
           <div style={{textAlign:"center"}}>
@@ -1093,7 +1093,7 @@ function AdminPanel({onLogout}){
       {showDecline&&<DeclineModal onConfirm={showDecline.onConfirm} onClose={()=>setShowDecline(null)}/>}
       <div style={{display:"flex",minHeight:"100vh"}}>
         {/* Sidebar */}
-        <div style={{width:240,background:"linear-gradient(180deg,#0D1117 0%,#161B27 100%)",
+        <div className="admin-sidebar" style={{width:240,background:"linear-gradient(180deg,#0D1117 0%,#161B27 100%)",
           borderRight:"1px solid rgba(255,255,255,0.06)",
           display:"flex",flexDirection:"column",padding:"20px 0",flexShrink:0}}>
           <div style={{padding:"0 20px 20px",borderBottom:"1px solid rgba(255,255,255,0.06)",marginBottom:8}}>
@@ -1133,8 +1133,20 @@ function AdminPanel({onLogout}){
         </div>
         {/* Content */}
         <div style={{flex:1,overflowY:"auto",background:"#0A0D14"}}>
+          {/* Mobile tab bar for admin */}
+          <div className="admin-mobile-tabs" style={{overflowX:"auto",padding:"12px 16px 0",gap:6,flexWrap:"nowrap",borderBottom:"1px solid #1E2536"}}>
+            {NAV_ITEMS.map(({id,label,icon,badge,badgeColor})=>(
+              <button key={id} onClick={()=>setTab(id)}
+                style={{flexShrink:0,padding:"7px 14px",borderRadius:20,fontSize:11,fontWeight:700,cursor:"pointer",border:"none",
+                  background:tab===id?"#5B21B6":"#161B27",color:tab===id?"#fff":"#9CA3AF",
+                  display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap"}}>
+                <span>{icon}</span>{label}
+                {badge!=null&&<span style={{background:badgeColor,color:"#fff",fontSize:9,fontWeight:800,borderRadius:20,padding:"1px 5px"}}>{badge}</span>}
+              </button>
+            ))}
+          </div>
           {/* Stats Bar */}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16,padding:"24px 32px 0"}}>
+          <div className="stat-grid admin-stats-bar" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16,padding:"24px 32px 0"}}>
             {[
               {label:"Total Keys",value:stats.keys,icon:"🔑",color:"#7C3AED",bg:"rgba(124,58,237,0.12)",border:"rgba(124,58,237,0.25)"},
               {label:"Pending Upgrades",value:stats.upgrades,icon:"⚡",color:"#3B82F6",bg:"rgba(59,130,246,0.12)",border:"rgba(59,130,246,0.25)"},
@@ -1237,7 +1249,7 @@ function AdminKeyDetail({keyObj,onBack}){
         </button>
       </div>
 
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:4}}>
+      <div className="two-col" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:4}}>
         {/* Key Details */}
         <Section title="Key Details">
           <Row label="Status" value={keyObj.status?.replace(/_/g," ")} highlight={keyObj.status==="available"?"#6EE7B7":keyObj.status==="used_upgrade"?"#A78BFA":"#9CA3AF"}/>
@@ -1608,7 +1620,7 @@ function AdminUpgradeDetail({req,onBack,onRefresh,onShowDecline}){
         </div>
       )}
 
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
+      <div className="two-col" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
         {/* Request Info */}
         <div style={{background:"#161B27",border:"1px solid #1E2536",borderRadius:14,padding:20}}>
           <p style={{margin:"0 0 16px",fontSize:13,fontWeight:800,color:"#E5E7EB",textTransform:"uppercase",
@@ -1856,7 +1868,7 @@ function AdminRenewDetail({req,onBack,onRefresh,onShowDecline}){
         </div>
       )}
 
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
+      <div className="two-col" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
         {/* Request Info */}
         <div style={{background:"#161B27",border:"1px solid #1E2536",borderRadius:14,padding:20}}>
           <p style={{margin:"0 0 16px",fontSize:13,fontWeight:800,color:"#E5E7EB",textTransform:"uppercase",letterSpacing:"0.08em"}}>Request Info</p>
@@ -2049,7 +2061,7 @@ function StatusPage(){
   ];
 
   return(
-    <div style={{maxWidth:720,margin:"0 auto",padding:"32px 20px"}}>
+    <div style={{maxWidth:720,margin:"0 auto",padding:"32px 16px"}}>
       {/* Header */}
       <div style={{marginBottom:28}}>
         <span style={{display:"inline-flex",alignItems:"center",gap:6,padding:"4px 12px",borderRadius:999,
@@ -2896,22 +2908,50 @@ export default function App(){
         input::placeholder{color:#8492A6;}
         button:active{opacity:0.9;}
         ::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-thumb{background:#D1D5DB;border-radius:2px;}
+        .nav-label{display:inline;}
+        .mobile-bottom-nav{display:none;}
+        .desktop-nav{display:flex;}
+        @media(max-width:640px){
+          .nav-label{display:none;}
+          .mobile-bottom-nav{display:flex;}
+          .desktop-nav{display:none;}
+          .two-col{grid-template-columns:1fr!important;}
+          .three-col{grid-template-columns:1fr 1fr!important;}
+          .page-pad{padding:16px 12px!important;}
+          .card-pad{padding:16px!important;}
+          .stat-grid{grid-template-columns:1fr 1fr!important;}
+          .processing-grid{grid-template-columns:1fr!important;}
+          .admin-sidebar{display:none!important;}
+          .admin-content{padding:16px!important;}
+          .admin-stats-bar{padding:16px 16px 0!important;}
+          .admin-mobile-tabs{display:flex!important;}
+        }
+        .admin-mobile-tabs{display:none;}
+        @media(max-width:480px){
+          .three-col{grid-template-columns:1fr!important;}
+          .stat-grid{grid-template-columns:1fr 1fr!important;}
+        }
+        @media(min-width:641px) and (max-width:900px){
+          .two-col{grid-template-columns:1fr!important;}
+          .three-col{grid-template-columns:1fr 1fr!important;}
+          .processing-grid{grid-template-columns:1fr!important;}
+        }
       `}</style>
 
-      {/* Nav */}
+      {/* Nav — desktop */}
       <nav style={{position:"sticky",top:0,zIndex:100,background:"rgba(242,244,248,0.92)",
         backdropFilter:"blur(14px)",borderBottom:`1px solid ${C.border}`}}>
-        <div style={{maxWidth:900,margin:"0 auto",padding:"0 20px",height:60,
+        <div style={{maxWidth:900,margin:"0 auto",padding:"0 16px",height:60,
           display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <div style={{width:32,height:32,borderRadius:9,background:"linear-gradient(135deg,#5B21B6,#7C3AED)",
               display:"flex",alignItems:"center",justifyContent:"center"}}>
-              <span style={{color:"#fff",fontWeight:900,fontSize:14}}>U</span>
+              <span style={{color:"#fff",fontWeight:900,fontSize:14}}>S</span>
             </div>
-            <span style={{fontWeight:900,fontSize:15,color:C.text}}>upgrader</span>
+            <span style={{fontWeight:900,fontSize:15,color:C.text}}>SpotiGrader</span>
             <span style={{fontWeight:400,color:C.textMuted,fontSize:15}}>.cc</span>
           </div>
-          <div style={{display:"flex",alignItems:"center",gap:3,background:C.surface,
+          <div className="desktop-nav" style={{alignItems:"center",gap:3,background:C.surface,
             border:`1px solid ${C.border}`,borderRadius:12,padding:3}}>
             {NAV_ITEMS.map(({id,label,emoji})=>(
               <button key={id} onClick={()=>navTo(id)} style={{
@@ -2919,14 +2959,30 @@ export default function App(){
                 fontSize:12,fontWeight:700,cursor:"pointer",
                 background:page===id?C.violet:"transparent",
                 color:page===id?"#fff":C.textSub,border:"none",transition:"all 0.15s"}}>
-                <span style={{fontSize:13}}>{emoji}</span>{label}
+                <span style={{fontSize:13}}>{emoji}</span><span className="nav-label">{label}</span>
               </button>
             ))}
           </div>
         </div>
       </nav>
 
-      <main>
+      {/* Mobile bottom nav */}
+      <div className="mobile-bottom-nav" style={{position:"fixed",bottom:0,left:0,right:0,zIndex:200,
+        background:"rgba(242,244,248,0.97)",backdropFilter:"blur(14px)",
+        borderTop:`1px solid ${C.border}`,padding:"6px 0 max(6px,env(safe-area-inset-bottom))"}}>
+        {NAV_ITEMS.map(({id,label,emoji})=>(
+          <button key={id} onClick={()=>navTo(id)} style={{
+            flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"6px 4px",
+            background:"none",border:"none",cursor:"pointer",
+            color:page===id?C.violet:C.textMuted}}>
+            <span style={{fontSize:20}}>{emoji}</span>
+            <span style={{fontSize:9,fontWeight:700,letterSpacing:"0.03em"}}>{label}</span>
+          </button>
+        ))}
+      </div>
+
+      <main style={{paddingBottom:"env(safe-area-inset-bottom)"}}>
+        <style>{`@media(max-width:640px){main{padding-bottom:72px!important;}}`}</style>
         {page==="upgrade"&&<UpgradePage onViewStatus={goToKeyInfo} onAdminLogin={loginAdmin} onMakerLogin={loginMaker}/>}
         {page==="renew"&&<RenewPage onViewStatus={goToKeyInfo} prefillKey={renewPrefill} key={renewPrefill}/>}
         {page==="keyinfo"&&<KeyInfoPage prefillKey={keyInfoPrefill} key={keyInfoPrefill} onRenew={goToRenew}/>}
@@ -2941,7 +2997,7 @@ export default function App(){
               display:"flex",alignItems:"center",justifyContent:"center"}}>
               <span style={{color:"#fff",fontWeight:900,fontSize:11}}>U</span>
             </div>
-            <span style={{fontSize:12,color:C.textSub,fontWeight:500}}>upgrader.cc — Automated Premium Service</span>
+            <span style={{fontSize:12,color:C.textSub,fontWeight:500}}>SpotiGrader.cc — Lifetime Spotify Upgrades</span>
           </div>
           <div style={{display:"flex",gap:14,fontSize:11,color:C.textMuted,fontWeight:600}}>
             <span>No logs kept</span><span>·</span><span>Encrypted</span><span>·</span><span>Lifetime guarantee</span>
