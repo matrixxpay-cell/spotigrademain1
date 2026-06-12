@@ -464,8 +464,7 @@ function KeyInfoPage({prefillKey="",onRenew}){
           Lookup System
         </span>
         <h1 style={{fontSize:26,fontWeight:900,color:C.text,margin:"0 0 6px",letterSpacing:"-0.03em"}}>Key Information</h1>
-        <p style={{color:C.textSub,fontSize:14,margin:"0 0 16px",lineHeight:1.6}}>Track upgrade status, verify your license key, or look up by Spotify username.</p>
-        <ProcessingNotice/>
+        <p style={{color:C.textSub,fontSize:14,margin:0,lineHeight:1.6}}>Track upgrade status, verify your license key, or look up by Spotify username.</p>
       </div>
 
       {/* Search */}
@@ -850,8 +849,7 @@ function UpgradePage({onViewStatus,onAdminLogin,onMakerLogin}){
         Automated System Online
       </span>
       <h1 style={{fontSize:26,fontWeight:900,color:C.text,margin:"0 0 6px",letterSpacing:"-0.03em"}}>Upgrade Your Account</h1>
-      <p style={{color:C.textSub,fontSize:14,margin:"0 0 16px",lineHeight:1.6}}>Follow the steps below to activate Spotify Premium instantly.</p>
-      <ProcessingNotice/>
+      <p style={{color:C.textSub,fontSize:14,margin:"0 0 24px",lineHeight:1.6}}>Follow the steps below to activate Spotify Premium instantly.</p>
 
       <Card style={{padding:26}}>
         <StepBar step={step} total={3} labels={labels}/>
@@ -1014,8 +1012,7 @@ function RenewPage({onViewStatus,prefillKey=""}){
         Lifetime Guarantee Active
       </span>
       <h1 style={{fontSize:26,fontWeight:900,color:C.text,margin:"0 0 6px",letterSpacing:"-0.03em"}}>Renew Premium Access</h1>
-      <p style={{color:C.textSub,fontSize:14,margin:"0 0 16px",lineHeight:1.6}}>Restore your Premium — covered by your lifetime guarantee.</p>
-      <ProcessingNotice/>
+      <p style={{color:C.textSub,fontSize:14,margin:"0 0 24px",lineHeight:1.6}}>Restore your Premium — covered by your lifetime guarantee.</p>
       <Card style={{padding:26}}>
         <StepBar step={step>2?step-1:step} total={6} labels={labels} color={C.green}/>
 
