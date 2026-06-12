@@ -382,6 +382,17 @@ function fmtDate(iso){
   if(!iso||iso==="—")return"—";
   return new Date(iso).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
 }
+function fmtRelTime(iso){
+  if(!iso)return"—";
+  const diff=Date.now()-new Date(iso).getTime();
+  const mins=Math.floor(diff/60000);
+  if(mins<1)return"just now";
+  if(mins<60)return`${mins} min${mins===1?"":"s"} ago`;
+  const hrs=Math.floor(mins/60);
+  if(hrs<24)return`${hrs} hr${hrs===1?"":"s"} ago`;
+  const days=Math.floor(hrs/24);
+  return`${days} day${days===1?"":"s"} ago`;
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 //  KEY INFO PAGE
@@ -1049,56 +1060,106 @@ function RenewPage({onViewStatus,prefillKey=""}){
 function AdminPanel({onLogout}){
   const [tab,setTab]=useState("keys");
   const [showDecline,setShowDecline]=useState(null);
+  const [stats,setStats]=useState({keys:0,upgrades:0,renewals:0,payouts:0});
+
+  useEffect(()=>{
+    Promise.all([
+      api.getKeys().catch(()=>[]),
+      api.getUpgradeRequests().catch(()=>[]),
+      api.getRenewRequests().catch(()=>[]),
+      api.getPayouts().catch(()=>[]),
+    ]).then(([keys,upgrades,renewals,payouts])=>{
+      setStats({
+        keys: Array.isArray(keys)?keys.length:0,
+        upgrades: Array.isArray(upgrades)?upgrades.filter(r=>r.status==="pending").length:0,
+        renewals: Array.isArray(renewals)?renewals.filter(r=>r.status==="pending").length:0,
+        payouts: Array.isArray(payouts)?payouts.filter(p=>p.status==="pending").length:0,
+      });
+    });
+  },[]);
+
+  const NAV_ITEMS=[
+    {id:"keys",label:"Key Management",icon:"🔑",badge:null},
+    {id:"upgrades",label:"Upgrade Requests",icon:"⚡",badge:stats.upgrades||null,badgeColor:"#F59E0B"},
+    {id:"renewals",label:"Renewal Requests",icon:"🔄",badge:stats.renewals||null,badgeColor:"#10B981"},
+    {id:"makers",label:"Manage Makers",icon:"👥",badge:null},
+    {id:"payouts",label:"Payout Queue",icon:"💸",badge:stats.payouts||null,badgeColor:"#F59E0B"},
+    {id:"settings",label:"Settings",icon:"⚙️",badge:null},
+  ];
+
   return(
-    <div style={{minHeight:"100vh",background:"#0F1117",fontFamily:"Inter,-apple-system,sans-serif"}}>
+    <div style={{minHeight:"100vh",background:"#0A0D14",fontFamily:"Inter,-apple-system,sans-serif"}}>
       <style>{`@keyframes spin{to{transform:rotate(360deg);}}@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}*{box-sizing:border-box;}input::placeholder{color:#6B7280;}`}</style>
       {showDecline&&<DeclineModal onConfirm={showDecline.onConfirm} onClose={()=>setShowDecline(null)}/>}
       <div style={{display:"flex",minHeight:"100vh"}}>
         {/* Sidebar */}
-        <div style={{width:230,background:"#161B27",borderRight:"1px solid #1E2536",
+        <div style={{width:240,background:"linear-gradient(180deg,#0D1117 0%,#161B27 100%)",
+          borderRight:"1px solid rgba(255,255,255,0.06)",
           display:"flex",flexDirection:"column",padding:"20px 0",flexShrink:0}}>
-          <div style={{padding:"0 20px 20px",borderBottom:"1px solid #1E2536",marginBottom:8}}>
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <div style={{width:32,height:32,borderRadius:8,
+          <div style={{padding:"0 20px 20px",borderBottom:"1px solid rgba(255,255,255,0.06)",marginBottom:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <div style={{width:36,height:36,borderRadius:10,
                 background:"linear-gradient(135deg,#5B21B6,#7C3AED)",
-                display:"flex",alignItems:"center",justifyContent:"center"}}>
-                <span style={{color:"#fff",fontWeight:900,fontSize:14}}>A</span>
+                display:"flex",alignItems:"center",justifyContent:"center",
+                boxShadow:"0 0 16px rgba(124,58,237,0.5)"}}>
+                <span style={{color:"#fff",fontWeight:900,fontSize:16}}>A</span>
               </div>
               <div>
-                <p style={{margin:0,fontSize:13,fontWeight:800,color:"#F9FAFB"}}>Admin Panel</p>
-                <p style={{margin:0,fontSize:10,color:"#6B7280"}}>spotigrader_main</p>
+                <p style={{margin:0,fontSize:14,fontWeight:800,color:"#F9FAFB",letterSpacing:"-0.3px"}}>Spotigrader</p>
+                <p style={{margin:0,fontSize:10,color:"#7C3AED",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.05em"}}>Admin</p>
               </div>
             </div>
           </div>
-          {[
-            {id:"keys",label:"Key Management",icon:"🔑"},
-            {id:"upgrades",label:"Upgrade Requests",icon:"⚡"},
-            {id:"renewals",label:"Renewal Requests",icon:"🔄"},
-            {id:"makers",label:"Manage Makers",icon:"👥"},
-            {id:"payouts",label:"Payout Queue",icon:"💸"},
-            {id:"settings",label:"Settings",icon:"⚙️"},
-          ].map(({id,label,icon})=>(
+          {NAV_ITEMS.map(({id,label,icon,badge,badgeColor})=>(
             <button key={id} onClick={()=>setTab(id)}
               style={{width:"100%",padding:"10px 20px",textAlign:"left",cursor:"pointer",
-                background:tab===id?"rgba(91,33,182,0.25)":"transparent",
+                background:tab===id?"rgba(124,58,237,0.15)":"transparent",
                 color:tab===id?"#A78BFA":"#9CA3AF",
                 border:"none",borderLeft:tab===id?"3px solid #7C3AED":"3px solid transparent",
                 fontSize:13,fontWeight:tab===id?700:500,
                 display:"flex",alignItems:"center",gap:10,transition:"all 0.15s"}}>
-              <span>{icon}</span>{label}
+              <span style={{fontSize:14}}>{icon}</span>
+              <span style={{flex:1}}>{label}</span>
+              {badge!=null&&(
+                <span style={{background:badgeColor,color:"#fff",fontSize:10,fontWeight:800,
+                  borderRadius:20,padding:"2px 7px",lineHeight:"1.4"}}>
+                  {badge}
+                </span>
+              )}
             </button>
           ))}
           <div style={{flex:1}}/>
           {onLogout&&<button onClick={onLogout} style={{margin:"0 20px",padding:"9px 0",borderRadius:8,background:"#1F2937",color:"#9CA3AF",fontSize:12,fontWeight:600,border:"1px solid #374151",cursor:"pointer"}}>← Logout</button>}
         </div>
         {/* Content */}
-        <div style={{flex:1,overflowY:"auto",padding:"28px 32px"}}>
-          {tab==="keys"&&<AdminKeys/>}
-          {tab==="upgrades"&&<AdminUpgrades onShowDecline={cb=>setShowDecline(cb)}/>}
-          {tab==="renewals"&&<AdminRenewals onShowDecline={cb=>setShowDecline(cb)}/>}
-          {tab==="makers"&&<AdminMakers/>}
-          {tab==="payouts"&&<AdminPayouts/>}
-          {tab==="settings"&&<AdminSettings/>}
+        <div style={{flex:1,overflowY:"auto",background:"#0A0D14"}}>
+          {/* Stats Bar */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16,padding:"24px 32px 0"}}>
+            {[
+              {label:"Total Keys",value:stats.keys,icon:"🔑",color:"#7C3AED",bg:"rgba(124,58,237,0.12)",border:"rgba(124,58,237,0.25)"},
+              {label:"Pending Upgrades",value:stats.upgrades,icon:"⚡",color:"#3B82F6",bg:"rgba(59,130,246,0.12)",border:"rgba(59,130,246,0.25)"},
+              {label:"Pending Renewals",value:stats.renewals,icon:"🔄",color:"#10B981",bg:"rgba(16,185,129,0.12)",border:"rgba(16,185,129,0.25)"},
+              {label:"Pending Payouts",value:stats.payouts,icon:"💸",color:"#F59E0B",bg:"rgba(245,158,11,0.12)",border:"rgba(245,158,11,0.25)"},
+            ].map(({label,value,icon,color,bg,border})=>(
+              <div key={label} style={{background:"#161B27",border:`1px solid ${border}`,borderRadius:14,padding:"16px 18px",display:"flex",alignItems:"center",gap:14}}>
+                <div style={{width:42,height:42,borderRadius:10,background:bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
+                  {icon}
+                </div>
+                <div>
+                  <p style={{margin:0,fontSize:24,fontWeight:900,color,lineHeight:1}}>{value}</p>
+                  <p style={{margin:"3px 0 0",fontSize:11,color:"#6B7280",fontWeight:500}}>{label}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{padding:"24px 32px"}}>
+            {tab==="keys"&&<AdminKeys/>}
+            {tab==="upgrades"&&<AdminUpgrades onShowDecline={cb=>setShowDecline(cb)}/>}
+            {tab==="renewals"&&<AdminRenewals onShowDecline={cb=>setShowDecline(cb)}/>}
+            {tab==="makers"&&<AdminMakers/>}
+            {tab==="payouts"&&<AdminPayouts/>}
+            {tab==="settings"&&<AdminSettings/>}
+          </div>
         </div>
       </div>
     </div>
@@ -1445,27 +1506,31 @@ function AdminUpgrades({onShowDecline}){
             <div style={{padding:"60px 0",textAlign:"center",color:"#6B7280",fontSize:14}}>No {tab} requests.</div>
           ):(
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              {filtered.map(r=>(
+              {filtered.map(r=>{
+                const accentColor=r.status==="pending"?"#F59E0B":r.status==="approved"?"#10B981":"#EF4444";
+                return(
                 <div key={r._id} onClick={()=>setSelected(r)}
                   style={{background:"#161B27",border:"1px solid #1E2536",borderRadius:14,
                     padding:"16px 20px",cursor:"pointer",transition:"border-color 0.15s",
-                    display:"grid",gridTemplateColumns:"1fr auto",gap:12,alignItems:"center"}}
+                    display:"grid",gridTemplateColumns:"1fr auto",gap:12,alignItems:"center",
+                    borderLeft:`4px solid ${accentColor}`,paddingLeft:16}}
                   onMouseEnter={e=>e.currentTarget.style.borderColor="#5B21B6"}
-                  onMouseLeave={e=>e.currentTarget.style.borderColor="#1E2536"}>
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor="#1E2536";e.currentTarget.style.borderLeftColor=accentColor;}}>
                   <div>
                     <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
                       <span style={{fontFamily:"monospace",fontSize:13,fontWeight:700,color:"#E5E7EB"}}>{r.key}</span>
                       <Badge status={r.status}/>
                     </div>
                     <p style={{margin:0,fontSize:12,color:"#6B7280"}}>
-                      {r.email} · {fmtDate(r.createdAt)}
+                      {r.email} · <span style={{color:"#9CA3AF"}}>{fmtRelTime(r.createdAt)}</span>
                       {r.confirmedUsername&&<> · @{r.confirmedUsername}</>}
                     </p>
                     {r.declineReason&&<p style={{margin:"3px 0 0",fontSize:11,color:"#F87171"}}>Reason: {r.declineReason}</p>}
                   </div>
-                  <span style={{color:"#6B7280",fontSize:18}}>›</span>
+                  <span style={{color:"#6B7280",fontSize:16,fontWeight:700}}>→</span>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </>
@@ -1686,25 +1751,29 @@ function AdminRenewals({onShowDecline}){
             <div style={{padding:"60px 0",textAlign:"center",color:"#6B7280",fontSize:14}}>No {tab} requests.</div>
           ):(
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              {filtered.map(r=>(
+              {filtered.map(r=>{
+                const accentColor=r.status==="pending"?"#F59E0B":r.status==="approved"?"#10B981":"#EF4444";
+                return(
                 <div key={r._id} onClick={()=>setSelected(r)}
                   style={{background:"#161B27",border:"1px solid #1E2536",borderRadius:14,
                     padding:"16px 20px",cursor:"pointer",transition:"border-color 0.15s",
-                    display:"grid",gridTemplateColumns:"1fr auto",gap:12,alignItems:"center"}}
+                    display:"grid",gridTemplateColumns:"1fr auto",gap:12,alignItems:"center",
+                    borderLeft:`4px solid ${accentColor}`,paddingLeft:16}}
                   onMouseEnter={e=>e.currentTarget.style.borderColor="#059669"}
-                  onMouseLeave={e=>e.currentTarget.style.borderColor="#1E2536"}>
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor="#1E2536";e.currentTarget.style.borderLeftColor=accentColor;}}>
                   <div>
                     <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
                       <span style={{fontFamily:"monospace",fontSize:13,fontWeight:700,color:"#E5E7EB"}}>{r.key}</span>
                       <Badge status={r.status}/>
                       {r.proofStatus&&<Badge status={r.proofStatus==="confirmed"?"approved":"declined"}/>}
                     </div>
-                    <p style={{margin:0,fontSize:12,color:"#6B7280"}}>{r.oldEmail} → {r.newEmail} · {fmtDate(r.createdAt)}</p>
+                    <p style={{margin:0,fontSize:12,color:"#6B7280"}}>{r.oldEmail} → {r.newEmail} · <span style={{color:"#9CA3AF"}}>{fmtRelTime(r.createdAt)}</span></p>
                     {r.declineReason&&<p style={{margin:"3px 0 0",fontSize:11,color:"#F87171"}}>Reason: {r.declineReason}</p>}
                   </div>
-                  <span style={{color:"#6B7280",fontSize:18}}>›</span>
+                  <span style={{color:"#6B7280",fontSize:16,fontWeight:700}}>→</span>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </>
@@ -2132,14 +2201,29 @@ function DeclineModal({onConfirm,onClose}){
 //  ADMIN PANEL — TABS FOR UPGRADE / RENEW
 // ════════════════════════════════════════════════════════════════════════════
 function RequestTabs({tab,setTab,counts}){
+  const TAB_STYLES={
+    pending:{active:{background:"#F59E0B",color:"#fff"},dot:"#F59E0B"},
+    approved:{active:{background:"#10B981",color:"#fff"},dot:"#10B981"},
+    declined:{active:{background:"#EF4444",color:"#fff"},dot:"#EF4444"},
+  };
   return(
-    <div style={{display:"flex",gap:3,background:"#0F1117",borderRadius:10,padding:3,marginBottom:20,width:"fit-content"}}>
-      {[["pending","Pending"],["approved","Completed"],["declined","Declined"]].map(([id,label])=>(
-        <button key={id} onClick={()=>setTab(id)}
-          style={{padding:"7px 16px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",border:"none",
-            background:tab===id?"#5B21B6":"transparent",color:tab===id?"#fff":"#6B7280",transition:"all 0.15s"}}>
-          {label}{counts&&counts[id]!=null?` (${counts[id]})`:""}</button>
-      ))}
+    <div style={{display:"flex",gap:6,marginBottom:20,width:"fit-content"}}>
+      {[["pending","Pending"],["approved","Completed"],["declined","Declined"]].map(([id,label])=>{
+        const s=TAB_STYLES[id];
+        const active=tab===id;
+        return(
+          <button key={id} onClick={()=>setTab(id)}
+            style={{padding:"7px 18px",borderRadius:999,fontSize:12,fontWeight:700,cursor:"pointer",
+              border:`1.5px solid ${active?s.active.background:"rgba(255,255,255,0.08)"}`,
+              background:active?s.active.background:"rgba(255,255,255,0.04)",
+              color:active?s.active.color:"#6B7280",
+              transition:"all 0.15s",display:"flex",alignItems:"center",gap:7}}>
+            {counts&&counts[id]>0&&(
+              <span style={{width:7,height:7,borderRadius:"50%",background:active?"rgba(255,255,255,0.7)":s.dot,display:"inline-block",flexShrink:0}}/>
+            )}
+            {label}{counts&&counts[id]!=null?` (${counts[id]})`:""}</button>
+        );
+      })}
     </div>
   );
 }
