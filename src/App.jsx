@@ -2071,7 +2071,7 @@ function StatusPage(){
           Live Status
         </span>
         <h1 style={{fontSize:26,fontWeight:900,color:C.text,margin:"0 0 6px",letterSpacing:"-0.03em"}}>System Status</h1>
-        <p style={{color:C.textSub,fontSize:14,margin:0}}>Real-time health of all upgrader.cc services.</p>
+        <p style={{color:C.textSub,fontSize:14,margin:0}}>Real-time health of all SpotiGrader.cc services.</p>
       </div>
 
       {/* Overall banner */}
