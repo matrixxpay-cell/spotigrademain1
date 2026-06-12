@@ -300,6 +300,21 @@ app.patch("/api/settings", async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── Public support status (for bot) ──────────────────────────────────────────
+app.get("/api/support-status", async (req, res) => {
+  try {
+    const s = await getSettings();
+    const hour = new Date().getUTCHours();
+    const inHours = hour >= s.supportStartHour && hour < s.supportEndHour;
+    res.json({
+      enabled: s.supportEnabled !== false,
+      startHour: s.supportStartHour ?? 0,
+      endHour: s.supportEndHour ?? 24,
+      inHours,
+    });
+  } catch { res.json({ enabled: true, inHours: true, startHour: 0, endHour: 24 }); }
+});
+
 // ── Health / Status ───────────────────────────────────────────────────────────
 app.get("/api/health", (req, res) => res.json({ ok: true }));
 

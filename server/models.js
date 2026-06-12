@@ -67,12 +67,15 @@ const payoutSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const appSettingsSchema = new mongoose.Schema({
-  makerRate: { type: Number, default: 0.09 },
-  smtpHost:  { type: String, default: "" },
-  smtpPort:  { type: Number, default: 587 },
-  smtpUser:  { type: String, default: "" },
-  smtpPass:  { type: String, default: "" },
-  smtpFrom:  { type: String, default: "" },
+  makerRate:         { type: Number, default: 0.09 },
+  smtpHost:          { type: String, default: "" },
+  smtpPort:          { type: Number, default: 587 },
+  smtpUser:          { type: String, default: "" },
+  smtpPass:          { type: String, default: "" },
+  smtpFrom:          { type: String, default: "" },
+  supportEnabled:    { type: Boolean, default: true },
+  supportStartHour:  { type: Number, default: 0 },   // UTC hour 0-23
+  supportEndHour:    { type: Number, default: 24 },  // UTC hour 1-24 (24 = midnight)
 }, { timestamps: true });
 
 const Key            = mongoose.model("Key", keySchema);

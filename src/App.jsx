@@ -2347,7 +2347,7 @@ function AdminMakers(){
 //  ADMIN — SETTINGS (SMTP + RATE)
 // ════════════════════════════════════════════════════════════════════════════
 function AdminSettings(){
-  const [s,setS]=useState({makerRate:0.09,smtpHost:"",smtpPort:587,smtpUser:"",smtpPass:"",smtpFrom:""});
+  const [s,setS]=useState({makerRate:0.09,smtpHost:"",smtpPort:587,smtpUser:"",smtpPass:"",smtpFrom:"",supportEnabled:true,supportStartHour:0,supportEndHour:24});
   const [saved,setSaved]=useState(false);
   const [loading,setLoading]=useState(false);
   useEffect(()=>{api.getSettings().then(r=>setS({...s,...r})).catch(()=>{});},[]);
@@ -2385,6 +2385,38 @@ function AdminSettings(){
             </div>
           </div>
         </div>
+        {/* Support Hours */}
+        <div style={{background:"#161B27",border:"1px solid #1E2536",borderRadius:12,padding:18}}>
+          <p style={{margin:"0 0 14px",fontSize:13,fontWeight:700,color:"#E5E7EB"}}>Telegram Support</p>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+            <span style={{fontSize:13,color:"#9CA3AF",fontWeight:600}}>Support Enabled</span>
+            <button onClick={()=>setS({...s,supportEnabled:!s.supportEnabled})}
+              style={{width:44,height:24,borderRadius:12,border:"none",cursor:"pointer",position:"relative",
+                background:s.supportEnabled?"#059669":"#374151",transition:"background 0.2s"}}>
+              <span style={{position:"absolute",top:3,left:s.supportEnabled?22:3,width:18,height:18,
+                borderRadius:"50%",background:"#fff",transition:"left 0.2s",display:"block"}}/>
+            </button>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <div>
+              <label style={{fontSize:11,color:"#6B7280",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",display:"block",marginBottom:4}}>Start Hour (UTC 0–23)</label>
+              <input type="number" min="0" max="23" value={s.supportStartHour||0}
+                onChange={e=>setS({...s,supportStartHour:parseInt(e.target.value)||0})}
+                style={{width:"100%",background:"#0F1117",border:"1px solid #2D3748",borderRadius:8,padding:"8px 12px",fontSize:13,color:"#F9FAFB",outline:"none",boxSizing:"border-box"}}/>
+            </div>
+            <div>
+              <label style={{fontSize:11,color:"#6B7280",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",display:"block",marginBottom:4}}>End Hour (UTC 1–24)</label>
+              <input type="number" min="1" max="24" value={s.supportEndHour||24}
+                onChange={e=>setS({...s,supportEndHour:parseInt(e.target.value)||24})}
+                style={{width:"100%",background:"#0F1117",border:"1px solid #2D3748",borderRadius:8,padding:"8px 12px",fontSize:13,color:"#F9FAFB",outline:"none",boxSizing:"border-box"}}/>
+            </div>
+          </div>
+          <p style={{margin:"8px 0 0",fontSize:11,color:"#4B5563"}}>
+            Current UTC hour: {new Date().getUTCHours()}:00 · Support now: {s.supportEnabled&&new Date().getUTCHours()>=s.supportStartHour&&new Date().getUTCHours()<s.supportEndHour
+              ?<span style={{color:"#6EE7B7"}}>✓ Active</span>:<span style={{color:"#F87171"}}>✗ Inactive</span>}
+          </p>
+        </div>
+
         <button onClick={save} disabled={loading}
           style={{padding:"10px 0",borderRadius:9,background:saved?"#059669":loading?"#374151":"#5B21B6",
             color:"#fff",fontSize:13,fontWeight:700,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>

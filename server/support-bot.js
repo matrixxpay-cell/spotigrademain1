@@ -1,7 +1,22 @@
 require("dotenv").config();
 const TelegramBot = require("node-telegram-bot-api");
-const fs   = require("fs");
-const path = require("path");
+const fs    = require("fs");
+const path  = require("path");
+const https = require("https");
+const http  = require("http");
+
+const API_BASE = process.env.API_BASE || "http://localhost:3001";
+
+function getSupportStatus() {
+  return new Promise((resolve) => {
+    const mod = API_BASE.startsWith("https") ? https : http;
+    mod.get(`${API_BASE}/api/support-status`, res => {
+      let d = "";
+      res.on("data", c => d += c);
+      res.on("end", () => { try { resolve(JSON.parse(d)); } catch { resolve({ enabled: true, inHours: true }); } });
+    }).on("error", () => resolve({ enabled: true, inHours: true }));
+  });
+}
 
 const TOKEN    = process.env.TELEGRAM_BOT_TOKEN;
 const AGENT_ID = process.env.TELEGRAM_AGENT_ID;
@@ -41,13 +56,26 @@ bot.on("message", async (msg) => {
   // Forward media from clients to agent
   if (chatId !== String(AGENT_ID) && !text) {
     if (!sessions[chatId]) {
+      const status = await getSupportStatus();
+      if (!status.enabled) {
+        bot.sendMessage(chatId, "⚠️ *Support is currently disabled.* Please try again later.", { parse_mode: "Markdown" });
+        return;
+      }
+      if (!status.inHours) {
+        const pad = n => String(n).padStart(2, "0");
+        bot.sendMessage(chatId,
+          `🕐 Sorry, our live agents are not available right now.\n\n⏰ Support hours: *${pad(status.startHour)}:00 UTC – ${pad(status.endHour === 24 ? 0 : status.endHour)}:00 UTC*\n\nPlease try again during support hours.`,
+          { parse_mode: "Markdown" }
+        );
+        return;
+      }
+      await bot.sendMessage(chatId, "⏳ Please wait, connecting you to a Live Agent...");
+      const delay = Math.floor(Math.random() * 26000) + 5000;
+      await new Promise(r => setTimeout(r, delay));
       const agentName = randomName();
-      sessions[chatId] = { agentName, firstName };
+      sessions[chatId] = { agentName, firstName, history: [] };
       saveSessions(sessions);
-      await bot.sendMessage(chatId,
-        `✅ You are now connected with *${agentName}*\n\n_Please wait — our agent will respond shortly._`,
-        { parse_mode: "Markdown" }
-      );
+      await bot.sendMessage(chatId, `✅ You are now connected with *${agentName}*\n\n_Please wait — our agent will respond shortly._`, { parse_mode: "Markdown" });
     }
     const caption = `📎 *${firstName}* (ID: \`${chatId}\`)`;
     if (msg.photo) {
@@ -125,9 +153,32 @@ bot.on("message", async (msg) => {
 
   // ── Client: first message — assign agent ────────────────────────────────────
   if (!sessions[chatId]) {
+    // Check support availability
+    const status = await getSupportStatus();
+    if (!status.enabled) {
+      bot.sendMessage(chatId, "⚠️ *Support is currently disabled.* Please try again later.", { parse_mode: "Markdown" });
+      return;
+    }
+    if (!status.inHours) {
+      const pad = n => String(n).padStart(2, "0");
+      bot.sendMessage(chatId,
+        `🕐 Sorry, our live agents are not available right now.\n\n` +
+        `⏰ Support hours: *${pad(status.startHour)}:00 UTC – ${pad(status.endHour === 24 ? 0 : status.endHour)}:00 UTC*\n\n` +
+        `Please try again during support hours.`,
+        { parse_mode: "Markdown" }
+      );
+      return;
+    }
+
+    // Show connecting message with random 5–30s delay
+    await bot.sendMessage(chatId, "⏳ Please wait, connecting you to a Live Agent...");
+    const delay = Math.floor(Math.random() * 26000) + 5000; // 5000–30000ms
+    await new Promise(r => setTimeout(r, delay));
+
     const agentName = randomName();
     sessions[chatId] = { agentName, firstName, history: [] };
     saveSessions(sessions);
+
     await bot.sendMessage(chatId,
       `✅ You are now connected with *${agentName}*\n\n_Please wait — our agent will respond shortly._`,
       { parse_mode: "Markdown" }
