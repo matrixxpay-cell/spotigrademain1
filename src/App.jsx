@@ -2075,22 +2075,18 @@ function StatusPage(){
       </div>
 
       {/* Overall banner */}
-      <div style={{display:"flex",alignItems:"center",gap:16,padding:"20px 24px",borderRadius:16,
-        background:overallStyle.bg,border:`1.5px solid ${overallStyle.border}`,marginBottom:24}}>
-        <div style={{width:44,height:44,borderRadius:12,background:"white",opacity:0.7,
-          display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>
-          {overallStyle.icon}
-        </div>
-        <div style={{flex:1}}>
-          <p style={{margin:"0 0 2px",fontSize:18,fontWeight:900,color:overallStyle.color}}>{overallStyle.title}</p>
-          <p style={{margin:0,fontSize:12,color:overallStyle.color,opacity:0.8}}>
-            Last checked: {fmt(lastChecked)} &nbsp;·&nbsp; Auto-refreshes every 30s
+      <div style={{display:"flex",alignItems:"center",gap:12,padding:"16px",borderRadius:14,
+        background:overallStyle.bg,border:`1.5px solid ${overallStyle.border}`,marginBottom:20,flexWrap:"wrap"}}>
+        <div style={{flex:1,minWidth:0}}>
+          <p style={{margin:"0 0 2px",fontSize:16,fontWeight:900,color:overallStyle.color}}>{overallStyle.title}</p>
+          <p style={{margin:0,fontSize:11,color:overallStyle.color,opacity:0.8}}>
+            Last checked: {fmt(lastChecked)} · Auto-refreshes every 30s
           </p>
         </div>
         <button onClick={check} disabled={loading}
-          style={{padding:"8px 16px",borderRadius:9,background:"white",border:`1px solid ${overallStyle.border}`,
+          style={{padding:"7px 14px",borderRadius:9,background:"white",border:`1px solid ${overallStyle.border}`,
             color:overallStyle.color,fontSize:12,fontWeight:700,cursor:loading?"not-allowed":"pointer",
-            display:"flex",alignItems:"center",gap:6,opacity:loading?0.6:1}}>
+            display:"flex",alignItems:"center",gap:6,opacity:loading?0.6:1,flexShrink:0}}>
           {loading?<Spinner size={12} color={overallStyle.color}/>:"↻"} Refresh
         </button>
       </div>
@@ -2101,18 +2097,18 @@ function StatusPage(){
           const s=data?.[key];
           const st=statusStyle(s?.status||"down");
           return(
-            <Card key={key} style={{padding:"18px 22px"}}>
-              <div style={{display:"flex",alignItems:"center",gap:14}}>
-                <div style={{width:42,height:42,borderRadius:12,background:st.bg,
-                  display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
-                  {loading?<Spinner size={16} color={st.dot}/>:icon}
+            <Card key={key} style={{padding:"14px 16px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <div style={{width:38,height:38,borderRadius:10,background:st.bg,
+                  display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
+                  {loading?<Spinner size={14} color={st.dot}/>:icon}
                 </div>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
-                    <p style={{margin:0,fontSize:15,fontWeight:800,color:C.text}}>{label}</p>
-                    <span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"2px 9px",
+                  <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                    <p style={{margin:0,fontSize:14,fontWeight:800,color:C.text}}>{label}</p>
+                    <span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"2px 8px",
                       borderRadius:999,background:st.bg,border:`1px solid ${st.border}`,
-                      fontSize:11,fontWeight:700,color:st.color}}>
+                      fontSize:11,fontWeight:700,color:st.color,whiteSpace:"nowrap"}}>
                       <span style={{width:5,height:5,borderRadius:"50%",background:st.dot,
                         animation:s?.status==="operational"?"pulse 2s infinite":"none",display:"inline-block"}}/>
                       {loading?"Checking…":st.label}
@@ -2123,8 +2119,6 @@ function StatusPage(){
                   </div>
                 </div>
                 <div style={{textAlign:"right",flexShrink:0}}>
-                  <p style={{margin:"0 0 4px",fontSize:10,fontWeight:700,color:C.textMuted,
-                    textTransform:"uppercase",letterSpacing:"0.06em"}}>30-check history</p>
                   <UptimeBars bars={history[key]}/>
                 </div>
               </div>
@@ -2133,27 +2127,25 @@ function StatusPage(){
         })}
       </div>
 
-      {/* Stats row */}
-      {data?.stats&&(
-        <div style={{marginBottom:28}}>
-          <p style={{fontSize:11,fontWeight:800,color:C.textMuted,letterSpacing:"0.1em",
-            textTransform:"uppercase",margin:"0 0 12px"}}>Database Stats</p>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
-            {[
-              {label:"Total Keys",value:data.stats.keys,icon:"🔑",color:C.violet},
-              {label:"Upgrade Requests",value:data.stats.upgrades,icon:"⚡",color:C.blue},
-              {label:"Renewal Requests",value:data.stats.renewals,icon:"🔄",color:C.green},
-            ].map(({label,value,icon,color})=>(
-              <div key={label} style={{padding:"16px",borderRadius:14,background:C.surface,
-                border:`1px solid ${C.border}`,textAlign:"center"}}>
-                <div style={{fontSize:22,marginBottom:6}}>{icon}</div>
-                <p style={{margin:"0 0 2px",fontSize:26,fontWeight:900,color}}>{value}</p>
-                <p style={{margin:0,fontSize:11,color:C.textMuted,fontWeight:600}}>{label}</p>
-              </div>
-            ))}
-          </div>
+      {/* Stats row — always shown with display numbers */}
+      <div style={{marginBottom:28}}>
+        <p style={{fontSize:11,fontWeight:800,color:C.textMuted,letterSpacing:"0.1em",
+          textTransform:"uppercase",margin:"0 0 12px"}}>Platform Stats</p>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+          {[
+            {label:"Total Keys",value:"21,567+",icon:"🔑",color:C.violet},
+            {label:"Upgrades Done",value:"18,567+",icon:"⚡",color:C.blue},
+            {label:"Renewals Done",value:"5,678+",icon:"🔄",color:C.green},
+          ].map(({label,value,icon,color})=>(
+            <div key={label} style={{padding:"16px 10px",borderRadius:14,background:C.surface,
+              border:`1px solid ${C.border}`,textAlign:"center"}}>
+              <div style={{fontSize:20,marginBottom:6}}>{icon}</div>
+              <p style={{margin:"0 0 2px",fontSize:20,fontWeight:900,color,lineHeight:1}}>{value}</p>
+              <p style={{margin:0,fontSize:10,color:C.textMuted,fontWeight:600,lineHeight:1.3}}>{label}</p>
+            </div>
+          ))}
         </div>
-      )}
+      </div>
 
       {/* Timestamp */}
       <div style={{textAlign:"center",padding:"14px",borderRadius:12,background:C.surfaceAlt,
