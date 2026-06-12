@@ -525,7 +525,7 @@ function KeyInfoPage({prefillKey="",onRenew}){
 //  PROCESSING SCREEN (shared by upgrade & renew)
 // ════════════════════════════════════════════════════════════════════════════
 function ProcessingScreen({type,keyStr,onViewStatus,onBack}){
-  const [s,setS]=useState(0);
+  const [status,setStatus]=useState("pending"); // pending / approved / declined
   const [last,setLast]=useState(new Date());
   const steps={
     upgrade:[
@@ -539,13 +539,26 @@ function ProcessingScreen({type,keyStr,onViewStatus,onBack}){
       {label:"Account renewed successfully"},
     ],
   }[type]||[];
+
+  // Poll real status every 10 seconds
   useEffect(()=>{
-    const t1=setTimeout(()=>setS(1),2800);
-    const t2=setTimeout(()=>setS(2),5500);
-    return()=>{clearTimeout(t1);clearTimeout(t2);};
-  },[]);
-  useEffect(()=>{const iv=setInterval(()=>setLast(new Date()),4000);return()=>clearInterval(iv);},[]);
-  const done=s>=2;
+    const poll=async()=>{
+      try{
+        const getReqs = type==="renew"?api.getRenewRequests:api.getUpgradeRequests;
+        const reqs=await getReqs();
+        const match=reqs.find(r=>r.key===keyStr);
+        if(match)setStatus(match.status);
+        setLast(new Date());
+      }catch{}
+    };
+    poll();
+    const iv=setInterval(poll,10000);
+    return()=>clearInterval(iv);
+  },[keyStr,type]);
+
+  const done=status==="approved";
+  const declined=status==="declined";
+  const s=done?2:status==="processing"?1:0;
   const accentColor=type==="renew"?C.green:C.violet;
   const fmt=d=>d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit",second:"2-digit"});
   return(
@@ -555,26 +568,27 @@ function ProcessingScreen({type,keyStr,onViewStatus,onBack}){
         <Card style={{padding:28}}>
           <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:22}}>
             <div style={{width:48,height:48,borderRadius:14,
-              background:done?C.greenLight:C.amberLight,
+              background:done?C.greenLight:declined?C.redLight:C.amberLight,
               display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:24}}>
-              {done?"✅":"⏳"}
+              {done?"✅":declined?"❌":"⏳"}
             </div>
             <div>
               <h2 style={{margin:"0 0 3px",fontSize:18,fontWeight:800,color:C.text}}>
-                {done?(type==="renew"?"Renewal Complete!":"Upgrade Complete!"):(type==="renew"?"Renewal In Progress":"Upgrade In Progress")}
+                {done?(type==="renew"?"Renewal Complete!":"Upgrade Complete!"):declined?"Request Declined":(type==="renew"?"Renewal In Progress":"Upgrade In Progress")}
               </h2>
               <p style={{margin:0,fontSize:13,color:C.textSub}}>
-                {done?"Your account is now Premium":"Processing your Spotify account..."}
+                {done?"Your account is now Premium":declined?"Your request was declined by admin":"Processing your Spotify account..."}
               </p>
             </div>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",borderRadius:12,marginBottom:18,
-            background:done?C.greenLight:"#FFFBEB",border:`1px solid ${done?C.greenBorder:C.amberBorder}`}}>
+            background:done?C.greenLight:declined?C.redLight:"#FFFBEB",
+            border:`1px solid ${done?C.greenBorder:declined?C.redBorder:C.amberBorder}`}}>
             <span style={{flexShrink:0}}>
-              {done?<span style={{color:C.green,fontSize:16,fontWeight:700}}>✓</span>:<Spinner size={14} color={C.amber}/>}
+              {done?<span style={{color:C.green,fontSize:16,fontWeight:700}}>✓</span>:declined?<span style={{color:C.red,fontSize:16,fontWeight:700}}>✕</span>:<Spinner size={14} color={C.amber}/>}
             </span>
-            <p style={{margin:0,fontSize:13,fontWeight:700,color:done?C.greenText:C.amber}}>
-              {done?"Successful — Premium is now active":"In Queue — Your request is being processed"}
+            <p style={{margin:0,fontSize:13,fontWeight:700,color:done?C.greenText:declined?C.redText:C.amber}}>
+              {done?"Successful — Premium is now active":declined?"Declined — Contact support for help":"In Queue — Waiting for admin to process"}
             </p>
           </div>
           <div style={{marginBottom:18}}>
@@ -588,14 +602,16 @@ function ProcessingScreen({type,keyStr,onViewStatus,onBack}){
                 style={{background:"none",border:"none",cursor:"pointer",color:C.textMuted,fontSize:15,padding:0}}>📋</button>
             </div>
           </div>
-          <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 13px",
-            background:C.surfaceAlt,border:`1px solid ${C.border}`,borderRadius:10}}>
-            <Spinner size={12} color={accentColor}/>
-            <div>
-              <p style={{margin:0,fontSize:12,fontWeight:700,color:accentColor}}>Auto-refreshing status</p>
-              <p style={{margin:"1px 0 0",fontSize:11,color:C.textMuted}}>Last checked: {fmt(last)}</p>
+          {!done&&!declined&&(
+            <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 13px",
+              background:C.surfaceAlt,border:`1px solid ${C.border}`,borderRadius:10}}>
+              <Spinner size={12} color={accentColor}/>
+              <div>
+                <p style={{margin:0,fontSize:12,fontWeight:700,color:accentColor}}>Checking every 10 seconds</p>
+                <p style={{margin:"1px 0 0",fontSize:11,color:C.textMuted}}>Last checked: {fmt(last)}</p>
+              </div>
             </div>
-          </div>
+          )}
         </Card>
         {/* Right */}
         <Card style={{padding:28}}>
