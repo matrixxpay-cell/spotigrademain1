@@ -1035,6 +1035,151 @@ function AdminPanel({onLogout}){
   );
 }
 
+// ─── Admin: Key Detail ────────────────────────────────────────────────────────
+function AdminKeyDetail({keyObj,onBack}){
+  const [upgradeReqs,setUpgradeReqs]=useState([]);
+  const [renewReqs,setRenewReqs]=useState([]);
+  const [makers,setMakers]=useState([]);
+  const [loading,setLoading]=useState(true);
+
+  useEffect(()=>{
+    const load=async()=>{
+      try{
+        const [u,r,m]=await Promise.all([api.getUpgradeRequests(),api.getRenewRequests(),api.getMakers()]);
+        setUpgradeReqs(u.filter(x=>x.key===keyObj.key));
+        setRenewReqs(r.filter(x=>x.key===keyObj.key));
+        setMakers(m);
+      }finally{setLoading(false);}
+    };
+    load();
+  },[keyObj.key]);
+
+  const getMakerName=(id)=>{
+    if(!id)return"—";
+    const m=makers.find(x=>x._id===id);
+    return m?m.name:`Unknown (${id})`;
+  };
+
+  const clLeft=cooldownLeft(keyObj.cooldownUntil);
+  const hasCooldown=keyObj.cooldownUntil&&new Date(keyObj.cooldownUntil)>new Date();
+
+  const Row=({label,value,mono=false,highlight})=>(
+    <div style={{display:"flex",justifyContent:"space-between",padding:"9px 0",borderBottom:"1px solid #1E2536",gap:12,flexWrap:"wrap"}}>
+      <span style={{fontSize:12,color:"#6B7280",fontWeight:600,flexShrink:0}}>{label}</span>
+      <span style={{fontSize:12,fontWeight:700,fontFamily:mono?"monospace":"inherit",wordBreak:"break-all",textAlign:"right",
+        color:highlight||"#E5E7EB"}}>{value||"—"}</span>
+    </div>
+  );
+
+  const Section=({title,children})=>(
+    <div style={{background:"#161B27",border:"1px solid #1E2536",borderRadius:14,padding:20,marginBottom:16}}>
+      <p style={{margin:"0 0 14px",fontSize:11,fontWeight:800,color:"#6B7280",textTransform:"uppercase",letterSpacing:"0.1em"}}>{title}</p>
+      {children}
+    </div>
+  );
+
+  return(
+    <div>
+      <button onClick={onBack} style={{background:"none",border:"none",cursor:"pointer",color:"#9CA3AF",
+        fontSize:13,fontWeight:600,display:"flex",alignItems:"center",gap:5,padding:0,marginBottom:20}}>
+        ← Back to Keys
+      </button>
+
+      <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:24}}>
+        <div>
+          <h2 style={{margin:"0 0 4px",fontSize:20,fontWeight:900,color:"#F9FAFB",fontFamily:"monospace",letterSpacing:"0.06em"}}>{keyObj.key}</h2>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <Badge status={keyObj.status}/>
+            {hasCooldown&&<span style={{fontSize:11,color:"#FCD34D",fontWeight:600}}>⏳ Cooldown: {clLeft}</span>}
+          </div>
+        </div>
+        <div style={{flex:1}}/>
+        {hasCooldown&&(
+          <button onClick={async()=>{await api.updateKey(keyObj._id,{cooldownUntil:null});onBack();}}
+            style={{padding:"7px 14px",borderRadius:8,background:"#1C1917",color:"#FCD34D",fontSize:12,fontWeight:700,border:"1px solid #78350F",cursor:"pointer"}}>
+            ⏳ Clear Cooldown
+          </button>
+        )}
+        <button onClick={()=>navigator.clipboard?.writeText(keyObj.key)}
+          style={{padding:"7px 14px",borderRadius:8,background:"#1F2937",color:"#9CA3AF",fontSize:12,fontWeight:700,border:"1px solid #374151",cursor:"pointer"}}>
+          📋 Copy
+        </button>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:4}}>
+        {/* Key Details */}
+        <Section title="Key Details">
+          <Row label="Status" value={keyObj.status?.replace(/_/g," ")} highlight={keyObj.status==="available"?"#6EE7B7":keyObj.status==="used_upgrade"?"#A78BFA":"#9CA3AF"}/>
+          <Row label="Used For" value={keyObj.usedFor}/>
+          <Row label="Purchase Date" value={fmtDate(keyObj.purchaseDate)}/>
+          <Row label="Used Date" value={fmtDate(keyObj.usedDate)}/>
+          <Row label="Cooldown Until" value={keyObj.cooldownUntil?new Date(keyObj.cooldownUntil).toLocaleString():"None"} highlight={hasCooldown?"#FCD34D":undefined}/>
+        </Section>
+
+        {/* Account Details */}
+        <Section title="Account Details">
+          <Row label="Spotify Email" value={keyObj.usedByEmail}/>
+          <Row label="Spotify Username" value={keyObj.usedByUsername?`@${keyObj.usedByUsername}`:null} highlight="#A78BFA"/>
+          <Row label="Country" value={keyObj.country}/>
+          <Row label="Plan" value={keyObj.plan}/>
+          <Row label="Upgrade Type" value={keyObj.upgradeType}/>
+          <Row label="Address" value={keyObj.address}/>
+        </Section>
+      </div>
+
+      {/* Upgrade History */}
+      <Section title={`Upgrade Requests (${upgradeReqs.length})`}>
+        {loading?(
+          <div style={{padding:"20px 0",textAlign:"center",color:"#6B7280"}}>Loading...</div>
+        ):upgradeReqs.length===0?(
+          <p style={{color:"#6B7280",fontSize:13,margin:0}}>No upgrade requests for this key.</p>
+        ):upgradeReqs.map((r,i)=>(
+          <div key={r._id} style={{marginBottom:i<upgradeReqs.length-1?16:0,paddingBottom:i<upgradeReqs.length-1?16:0,borderBottom:i<upgradeReqs.length-1?"1px solid #1E2536":"none"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+              <Badge status={r.status}/>
+              <span style={{fontSize:11,color:"#6B7280"}}>{fmtDate(r.createdAt)}</span>
+              {r.processedBy&&<span style={{fontSize:11,color:"#A78BFA",fontWeight:600}}>by {getMakerName(r.processedBy)}</span>}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+              {[["Email",r.email],["Password",r.password],["Country",r.country],["Username",r.confirmedUsername?`@${r.confirmedUsername}`:null],["Plan",r.plan],["Upgrade Type",r.upgradeType],["Address",r.address],["Decline Reason",r.declineReason]].filter(([,v])=>v).map(([lbl,val])=>(
+                <div key={lbl} style={{padding:"7px 10px",background:"#0F1117",borderRadius:8,border:"1px solid #1E2536"}}>
+                  <p style={{margin:"0 0 2px",fontSize:10,color:"#4B5563",fontWeight:700,textTransform:"uppercase"}}>{lbl}</p>
+                  <p style={{margin:0,fontSize:12,color:"#E5E7EB",fontWeight:600,wordBreak:"break-all"}}>{val}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </Section>
+
+      {/* Renewal History */}
+      <Section title={`Renewal Requests (${renewReqs.length})`}>
+        {loading?(
+          <div style={{padding:"20px 0",textAlign:"center",color:"#6B7280"}}>Loading...</div>
+        ):renewReqs.length===0?(
+          <p style={{color:"#6B7280",fontSize:13,margin:0}}>No renewal requests for this key.</p>
+        ):renewReqs.map((r,i)=>(
+          <div key={r._id} style={{marginBottom:i<renewReqs.length-1?16:0,paddingBottom:i<renewReqs.length-1?16:0,borderBottom:i<renewReqs.length-1?"1px solid #1E2536":"none"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+              <Badge status={r.status}/>
+              <span style={{fontSize:11,color:"#6B7280"}}>{fmtDate(r.createdAt)}</span>
+              {r.processedBy&&<span style={{fontSize:11,color:"#A78BFA",fontWeight:600}}>by {getMakerName(r.processedBy)}</span>}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+              {[["Old Email",r.oldEmail],["Old Password",r.oldPassword],["New Email",r.newEmail],["New Password",r.newPassword],["Country",r.country],["Username",r.confirmedUsername?`@${r.confirmedUsername}`:null],["Proof Files",(r.files||[]).join(", ")||null],["Decline Reason",r.declineReason]].filter(([,v])=>v).map(([lbl,val])=>(
+                <div key={lbl} style={{padding:"7px 10px",background:"#0F1117",borderRadius:8,border:"1px solid #1E2536"}}>
+                  <p style={{margin:"0 0 2px",fontSize:10,color:"#4B5563",fontWeight:700,textTransform:"uppercase"}}>{lbl}</p>
+                  <p style={{margin:0,fontSize:12,color:"#E5E7EB",fontWeight:600,wordBreak:"break-all"}}>{val}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </Section>
+    </div>
+  );
+}
+
 // ─── Admin: Key Management ────────────────────────────────────────────────────
 function AdminKeys(){
   const [keys,setKeys]=useState([]);
@@ -1042,6 +1187,7 @@ function AdminKeys(){
   const [genCount,setGenCount]=useState("10");
   const [genLoading,setGenLoading]=useState(false);
   const [copied,setCopied]=useState(null);
+  const [detailKey,setDetailKey]=useState(null);
 
   const refresh=()=>api.getKeys().then(setKeys).catch(()=>{});
   useEffect(()=>{refresh();},[]);
@@ -1069,6 +1215,8 @@ function AdminKeys(){
 
   const statusColor={available:"#059669",processing:"#1D4ED8",used_upgrade:"#6D28D9",
     used_renew:"#7C3AED",cooldown:"#D97706",expired:"#DC2626"};
+
+  if(detailKey)return <AdminKeyDetail keyObj={detailKey} onBack={()=>{setDetailKey(null);refresh();}}/>;
 
   return(
     <div>
@@ -1140,8 +1288,8 @@ function AdminKeys(){
               transition:"background 0.15s"}}>
               <input type="checkbox" checked={isSel} onChange={()=>toggle(k._id)}
                 style={{accentColor:"#7C3AED",width:14,height:14}}/>
-              <div>
-                <span style={{fontFamily:"monospace",fontSize:12,fontWeight:700,color:"#E5E7EB",letterSpacing:"0.05em"}}>{k.key}</span>
+              <div style={{cursor:"pointer"}} onClick={()=>setDetailKey(k)}>
+                <span style={{fontFamily:"monospace",fontSize:12,fontWeight:700,color:"#A78BFA",letterSpacing:"0.05em",textDecoration:"underline",textDecorationStyle:"dotted"}}>{k.key}</span>
                 {k.usedByUsername&&<p style={{margin:"2px 0 0",fontSize:10,color:"#6B7280"}}>@{k.usedByUsername}</p>}
               </div>
               <div style={{display:"flex",alignItems:"center",gap:5}}>
