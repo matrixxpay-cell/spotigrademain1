@@ -40,6 +40,7 @@ const NAV_ITEMS = [
   {id:"upgrade",label:"Upgrade",emoji:"⚡"},
   {id:"renew",  label:"Renew",  emoji:"🔄"},
   {id:"keyinfo",label:"Key Info",emoji:"🔑"},
+  {id:"status", label:"Status",  emoji:"📡"},
 ];
 
 function Badge({status}){
@@ -1599,6 +1600,185 @@ function AdminRenewDetail({req,onBack,onRefresh}){
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+//  STATUS PAGE
+// ════════════════════════════════════════════════════════════════════════════
+function StatusPage(){
+  const [data,setData]=useState(null);
+  const [loading,setLoading]=useState(true);
+  const [lastChecked,setLastChecked]=useState(null);
+  const [history,setHistory]=useState({api:[],database:[],service:[]});
+
+  const check=useCallback(async()=>{
+    setLoading(true);
+    try{
+      const t0=Date.now();
+      const r=await fetch(`${API}/status`);
+      const json=await r.json();
+      const now=new Date();
+      setData(json);
+      setLastChecked(now);
+      setHistory(h=>({
+        api:[...h.api.slice(-29),{t:now,ok:json.api?.status==="operational"}],
+        database:[...h.database.slice(-29),{t:now,ok:json.database?.status==="operational"}],
+        service:[...h.service.slice(-29),{t:now,ok:json.service?.status==="operational"}],
+      }));
+    }catch{
+      setData(null);
+    }finally{setLoading(false);}
+  },[]);
+
+  useEffect(()=>{check();const iv=setInterval(check,30000);return()=>clearInterval(iv);},[check]);
+
+  const statusStyle=(s)=>{
+    if(s==="operational")return{bg:C.greenLight,border:C.greenBorder,color:C.greenText,dot:"#059669",label:"Operational"};
+    if(s==="degraded")   return{bg:C.amberLight,border:C.amberBorder,color:C.amberText,dot:"#D97706",label:"Degraded"};
+    return                     {bg:C.redLight,  border:C.redBorder,  color:C.redText,  dot:C.red,   label:"Down"};
+  };
+
+  const overall=data
+    ? (["api","database","service"].every(k=>data[k]?.status==="operational")
+        ?"operational"
+        :["api","database","service"].some(k=>data[k]?.status==="down")
+          ?"down":"degraded")
+    : (loading ? "checking" : "down");
+
+  const overallStyle=overall==="operational"
+    ?{bg:C.greenLight,border:C.greenBorder,color:C.greenText,icon:"✓",title:"All Systems Operational"}
+    :overall==="degraded"
+    ?{bg:C.amberLight,border:C.amberBorder,color:C.amberText,icon:"⚠",title:"Partial Outage"}
+    :overall==="checking"
+    ?{bg:C.blueLight, border:C.blueBorder, color:C.blueText, icon:"·",title:"Checking Systems…"}
+    :{bg:C.redLight,  border:C.redBorder,  color:C.redText,  icon:"✕",title:"System Outage"};
+
+  const fmt=d=>d?d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit",second:"2-digit"}):"—";
+  const fmtMs=ms=>ms!=null?`${ms}ms`:"—";
+
+  const UptimeBars=({bars})=>(
+    <div style={{display:"flex",gap:2,alignItems:"flex-end"}}>
+      {Array.from({length:30}).map((_,i)=>{
+        const entry=bars[i-(30-bars.length)];
+        const color=!entry?"#E1E6EF":entry.ok?"#059669":C.red;
+        return<div key={i} style={{width:7,height:20,borderRadius:2,background:color,flexShrink:0}}/>;
+      })}
+    </div>
+  );
+
+  const services=[
+    {key:"service",  label:"Web Service",    icon:"🌐", desc:"GitHub Pages frontend"},
+    {key:"api",      label:"API Server",      icon:"⚙️", desc:"Express REST API · port 3001"},
+    {key:"database", label:"MongoDB Database",icon:"🗄️", desc:"SpotigraderSagar · 45.13.239.204"},
+  ];
+
+  return(
+    <div style={{maxWidth:720,margin:"0 auto",padding:"32px 20px"}}>
+      {/* Header */}
+      <div style={{marginBottom:28}}>
+        <span style={{display:"inline-flex",alignItems:"center",gap:6,padding:"4px 12px",borderRadius:999,
+          background:C.blueLight,color:C.blue,fontSize:11,fontWeight:700,
+          border:`1px solid ${C.blueBorder}`,marginBottom:12}}>
+          <span style={{width:6,height:6,borderRadius:"50%",background:C.blue}}/>
+          Live Status
+        </span>
+        <h1 style={{fontSize:26,fontWeight:900,color:C.text,margin:"0 0 6px",letterSpacing:"-0.03em"}}>System Status</h1>
+        <p style={{color:C.textSub,fontSize:14,margin:0}}>Real-time health of all upgrader.cc services.</p>
+      </div>
+
+      {/* Overall banner */}
+      <div style={{display:"flex",alignItems:"center",gap:16,padding:"20px 24px",borderRadius:16,
+        background:overallStyle.bg,border:`1.5px solid ${overallStyle.border}`,marginBottom:24}}>
+        <div style={{width:44,height:44,borderRadius:12,background:"white",opacity:0.7,
+          display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>
+          {overallStyle.icon}
+        </div>
+        <div style={{flex:1}}>
+          <p style={{margin:"0 0 2px",fontSize:18,fontWeight:900,color:overallStyle.color}}>{overallStyle.title}</p>
+          <p style={{margin:0,fontSize:12,color:overallStyle.color,opacity:0.8}}>
+            Last checked: {fmt(lastChecked)} &nbsp;·&nbsp; Auto-refreshes every 30s
+          </p>
+        </div>
+        <button onClick={check} disabled={loading}
+          style={{padding:"8px 16px",borderRadius:9,background:"white",border:`1px solid ${overallStyle.border}`,
+            color:overallStyle.color,fontSize:12,fontWeight:700,cursor:loading?"not-allowed":"pointer",
+            display:"flex",alignItems:"center",gap:6,opacity:loading?0.6:1}}>
+          {loading?<Spinner size={12} color={overallStyle.color}/>:"↻"} Refresh
+        </button>
+      </div>
+
+      {/* Service cards */}
+      <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:28}}>
+        {services.map(({key,label,icon,desc})=>{
+          const s=data?.[key];
+          const st=statusStyle(s?.status||"down");
+          return(
+            <Card key={key} style={{padding:"18px 22px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:14}}>
+                <div style={{width:42,height:42,borderRadius:12,background:st.bg,
+                  display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>
+                  {loading?<Spinner size={16} color={st.dot}/>:icon}
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
+                    <p style={{margin:0,fontSize:15,fontWeight:800,color:C.text}}>{label}</p>
+                    <span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"2px 9px",
+                      borderRadius:999,background:st.bg,border:`1px solid ${st.border}`,
+                      fontSize:11,fontWeight:700,color:st.color}}>
+                      <span style={{width:5,height:5,borderRadius:"50%",background:st.dot,
+                        animation:s?.status==="operational"?"pulse 2s infinite":"none",display:"inline-block"}}/>
+                      {loading?"Checking…":st.label}
+                    </span>
+                    {s?.latency!=null&&(
+                      <span style={{fontSize:11,color:C.textMuted,fontWeight:600}}>{fmtMs(s.latency)}</span>
+                    )}
+                  </div>
+                  <p style={{margin:0,fontSize:12,color:C.textMuted}}>{desc}</p>
+                </div>
+                <div style={{textAlign:"right",flexShrink:0}}>
+                  <p style={{margin:"0 0 4px",fontSize:10,fontWeight:700,color:C.textMuted,
+                    textTransform:"uppercase",letterSpacing:"0.06em"}}>30-check history</p>
+                  <UptimeBars bars={history[key]}/>
+                </div>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* Stats row */}
+      {data?.stats&&(
+        <div style={{marginBottom:28}}>
+          <p style={{fontSize:11,fontWeight:800,color:C.textMuted,letterSpacing:"0.1em",
+            textTransform:"uppercase",margin:"0 0 12px"}}>Database Stats</p>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+            {[
+              {label:"Total Keys",value:data.stats.keys,icon:"🔑",color:C.violet},
+              {label:"Upgrade Requests",value:data.stats.upgrades,icon:"⚡",color:C.blue},
+              {label:"Renewal Requests",value:data.stats.renewals,icon:"🔄",color:C.green},
+            ].map(({label,value,icon,color})=>(
+              <div key={label} style={{padding:"16px",borderRadius:14,background:C.surface,
+                border:`1px solid ${C.border}`,textAlign:"center"}}>
+                <div style={{fontSize:22,marginBottom:6}}>{icon}</div>
+                <p style={{margin:"0 0 2px",fontSize:26,fontWeight:900,color}}>{value}</p>
+                <p style={{margin:0,fontSize:11,color:C.textMuted,fontWeight:600}}>{label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Timestamp */}
+      <div style={{textAlign:"center",padding:"14px",borderRadius:12,background:C.surfaceAlt,
+        border:`1px solid ${C.border}`}}>
+        <p style={{margin:0,fontSize:12,color:C.textMuted}}>
+          {data
+            ? <>Status as of <strong>{new Date(data.timestamp).toLocaleString()}</strong></>
+            : loading ? "Fetching status…" : "Could not reach API server"}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 //  ROOT APP
 // ════════════════════════════════════════════════════════════════════════════
 export default function App(){
@@ -1669,6 +1849,7 @@ export default function App(){
         {page==="upgrade"&&<UpgradePage onViewStatus={goToKeyInfo}/>}
         {page==="renew"&&<RenewPage onViewStatus={goToKeyInfo} prefillKey={renewPrefill} key={renewPrefill}/>}
         {page==="keyinfo"&&<KeyInfoPage prefillKey={keyInfoPrefill} key={keyInfoPrefill} onRenew={goToRenew}/>}
+        {page==="status"&&<StatusPage/>}
       </main>
 
       <footer style={{borderTop:`1px solid ${C.border}`,marginTop:20}}>

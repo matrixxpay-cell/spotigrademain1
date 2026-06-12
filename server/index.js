@@ -128,7 +128,47 @@ app.patch("/api/renew-requests/:id", async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── Health check ─────────────────────────────────────────────────────────────
+// ── Health / Status ───────────────────────────────────────────────────────────
 app.get("/api/health", (req, res) => res.json({ ok: true }));
+
+app.get("/api/status", async (req, res) => {
+  const start = Date.now();
+
+  // DB status
+  const dbState = mongoose.connection.readyState;
+  // 0=disconnected 1=connected 2=connecting 3=disconnecting
+  const dbStateMap = { 0:"down", 1:"operational", 2:"degraded", 3:"degraded" };
+  let dbPing = null;
+  let dbLatency = null;
+  if (dbState === 1) {
+    try {
+      const t0 = Date.now();
+      await mongoose.connection.db.admin().ping();
+      dbLatency = Date.now() - t0;
+      dbPing = "operational";
+    } catch { dbPing = "down"; }
+  }
+
+  // Key/request counts
+  let stats = null;
+  try {
+    const [keys, upgrades, renewals] = await Promise.all([
+      Key.countDocuments(),
+      UpgradeRequest.countDocuments(),
+      RenewRequest.countDocuments(),
+    ]);
+    stats = { keys, upgrades, renewals };
+  } catch { /* non-fatal */ }
+
+  const apiLatency = Date.now() - start;
+
+  res.json({
+    api:      { status: "operational", latency: apiLatency },
+    database: { status: dbPing || dbStateMap[dbState] || "down", latency: dbLatency },
+    service:  { status: "operational" },
+    stats,
+    timestamp: new Date().toISOString(),
+  });
+});
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
