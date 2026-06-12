@@ -2127,15 +2127,15 @@ function StatusPage(){
         })}
       </div>
 
-      {/* Stats row — always shown with display numbers */}
+      {/* Stats row — hardcoded base + real DB count */}
       <div style={{marginBottom:28}}>
         <p style={{fontSize:11,fontWeight:800,color:C.textMuted,letterSpacing:"0.1em",
           textTransform:"uppercase",margin:"0 0 12px"}}>Platform Stats</p>
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
           {[
-            {label:"Total Keys",value:"21,567+",icon:"🔑",color:C.violet},
-            {label:"Upgrades Done",value:"18,567+",icon:"⚡",color:C.blue},
-            {label:"Renewals Done",value:"5,678+",icon:"🔄",color:C.green},
+            {label:"Total Keys",value:(21567+(data?.stats?.keys||0)).toLocaleString()+"+",icon:"🔑",color:C.violet},
+            {label:"Upgrades Done",value:(18567+(data?.stats?.upgrades||0)).toLocaleString()+"+",icon:"⚡",color:C.blue},
+            {label:"Renewals Done",value:(5678+(data?.stats?.renewals||0)).toLocaleString()+"+",icon:"🔄",color:C.green},
           ].map(({label,value,icon,color})=>(
             <div key={label} style={{padding:"16px 10px",borderRadius:14,background:C.surface,
               border:`1px solid ${C.border}`,textAlign:"center"}}>
