@@ -2271,13 +2271,20 @@ function AdminRenewDetail({req,onBack,onRefresh,onShowDecline}){
                     borderRadius:8,padding:"8px 12px",fontSize:13,color:"#F9FAFB",outline:"none",
                     width:"100%",marginBottom:8}}/>
                 {usernameError&&<p style={{fontSize:12,color:"#F87171",margin:"0 0 8px",fontWeight:600}}>{usernameError}</p>}
-                <button onClick={checkUsername} disabled={!enteredUsername.trim()}
-                  style={{padding:"9px 0",borderRadius:8,
-                    background:enteredUsername.trim()?"#1D4ED8":"#374151",
-                    color:"#fff",fontSize:12,fontWeight:700,border:"none",
-                    cursor:enteredUsername.trim()?"pointer":"not-allowed",width:"100%"}}>
-                  Verify Username
-                </button>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  <button onClick={handleDecline}
+                    style={{padding:"9px 0",borderRadius:8,background:"#7F1D1D",color:"#FCA5A5",
+                      fontSize:12,fontWeight:700,border:"1px solid #991B1B",cursor:"pointer"}}>
+                    ✕ Decline
+                  </button>
+                  <button onClick={checkUsername} disabled={!enteredUsername.trim()}
+                    style={{padding:"9px 0",borderRadius:8,
+                      background:enteredUsername.trim()?"#1D4ED8":"#374151",
+                      color:"#fff",fontSize:12,fontWeight:700,border:"none",
+                      cursor:enteredUsername.trim()?"pointer":"not-allowed"}}>
+                    Verify Username
+                  </button>
+                </div>
               </>
             ):(
               <div style={{padding:"10px 12px",background:"#064E3B",border:"1px solid #065F46",
@@ -3364,11 +3371,16 @@ function MakerRenewDetail({req,maker,onBack,onDecline,onApproved}){
               <input placeholder="Spotify username" value={enteredUsername} onChange={e=>{setEnteredUsername(e.target.value);setUsernameError("");}}
                 style={{background:DA,border:`1px solid ${usernameError?"#DC2626":"#2D3748"}`,borderRadius:8,padding:"8px 12px",fontSize:13,color:DT,outline:"none",width:"100%"}}/>
               {usernameError&&<p style={{fontSize:12,color:"#F87171",margin:0}}>{usernameError}</p>}
-              <button onClick={checkUsername} disabled={!enteredUsername.trim()}
-                style={{padding:"9px 0",borderRadius:8,background:enteredUsername.trim()?"#1D4ED8":"#374151",color:"#fff",fontSize:12,fontWeight:700,border:"none",cursor:"pointer",width:"100%"}}>
-                Verify Username
-              </button>
-              {usernameError&&<button onClick={()=>onDecline(r)} style={{padding:"9px 0",borderRadius:8,background:"#7F1D1D",color:"#FCA5A5",fontSize:12,fontWeight:700,border:"1px solid #991B1B",cursor:"pointer",width:"100%"}}>✕ Decline</button>}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <button onClick={()=>onDecline(r)}
+                  style={{padding:"9px 0",borderRadius:8,background:"#7F1D1D",color:"#FCA5A5",fontSize:12,fontWeight:700,border:"1px solid #991B1B",cursor:"pointer"}}>
+                  ✕ Decline
+                </button>
+                <button onClick={checkUsername} disabled={!enteredUsername.trim()}
+                  style={{padding:"9px 0",borderRadius:8,background:enteredUsername.trim()?"#1D4ED8":"#374151",color:"#fff",fontSize:12,fontWeight:700,border:"none",cursor:"pointer"}}>
+                  Verify Username
+                </button>
+              </div>
             </div>
           ):(
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
