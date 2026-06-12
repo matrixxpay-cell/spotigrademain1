@@ -496,16 +496,18 @@ function KeyInfoPage({prefillKey="",onRenew}){
       {/* Result */}
       {data&&(
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
-          {/* Declined request banners — only show if no newer pending/approved request exists after it */}
-          {requests.filter(r=>{
-            if(r.status!=="declined")return false;
+          {/* Declined request banners — only show the single most recent declined request, and only if no newer active request exists after it */}
+          {(()=>{
+            const declined=requests.filter(r=>r.status==="declined")
+              .sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+            if(!declined.length)return[];
+            const mostRecent=declined[0];
             const newerActive=requests.some(x=>
-              x._id!==r._id&&
               (x.status==="pending"||x.status==="approved"||x.status==="processing")&&
-              new Date(x.createdAt)>=new Date(r.createdAt)
+              new Date(x.createdAt)>=new Date(mostRecent.createdAt)
             );
-            return !newerActive;
-          }).map(r=>(
+            return newerActive?[]:[mostRecent];
+          })().map(r=>(
             <div key={r._id} style={{padding:"14px 16px",borderRadius:14,background:C.redLight,
               border:`1px solid ${C.redBorder}`,display:"flex",gap:12,alignItems:"flex-start"}}>
               <span style={{fontSize:20,flexShrink:0}}>❌</span>
@@ -1937,11 +1939,18 @@ function AdminUpgradeDetail({req,onBack,onRefresh,onShowDecline}){
               <input placeholder="spotify_username" value={username} onChange={e=>setUsername(e.target.value)}
                 style={{background:"#0F1117",border:"1px solid #2D3748",borderRadius:8,padding:"8px 12px",
                   fontSize:13,color:"#F9FAFB",outline:"none",width:"100%"}}/>
-              <button onClick={confirmUsername} disabled={!username.trim()}
-                style={{padding:"9px 0",borderRadius:8,background:username.trim()?"#1D4ED8":"#374151",
-                  color:"#fff",fontSize:13,fontWeight:700,border:"none",cursor:username.trim()?"pointer":"not-allowed",width:"100%"}}>
-                Confirm Username
-              </button>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <button onClick={handleDecline}
+                  style={{padding:"9px 0",borderRadius:8,background:"#7F1D1D",color:"#FCA5A5",
+                    fontSize:12,fontWeight:700,border:"1px solid #991B1B",cursor:"pointer"}}>
+                  ✕ Decline
+                </button>
+                <button onClick={confirmUsername} disabled={!username.trim()}
+                  style={{padding:"9px 0",borderRadius:8,background:username.trim()?"#1D4ED8":"#374151",
+                    color:"#fff",fontSize:13,fontWeight:700,border:"none",cursor:username.trim()?"pointer":"not-allowed"}}>
+                  Confirm Username
+                </button>
+              </div>
             </div>
           ):(
             <div style={{display:"flex",flexDirection:"column",gap:12}}>
@@ -3230,10 +3239,17 @@ function MakerUpgradeDetail({req,maker,onBack,onDecline,onApproved}){
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
               <input placeholder="Spotify username" value={username} onChange={e=>setUsername(e.target.value)}
                 style={{background:DA,border:`1px solid #2D3748`,borderRadius:8,padding:"8px 12px",fontSize:13,color:DT,outline:"none",width:"100%"}}/>
-              <button onClick={confirmUsername} disabled={!username.trim()}
-                style={{padding:"9px 0",borderRadius:8,background:username.trim()?"#1D4ED8":"#374151",color:"#fff",fontSize:13,fontWeight:700,border:"none",cursor:"pointer",width:"100%"}}>
-                Confirm Username
-              </button>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <button onClick={handleDecline}
+                  style={{padding:"9px 0",borderRadius:8,background:"#7F1D1D",color:"#FCA5A5",
+                    fontSize:12,fontWeight:700,border:"1px solid #991B1B",cursor:"pointer"}}>
+                  ✕ Decline
+                </button>
+                <button onClick={confirmUsername} disabled={!username.trim()}
+                  style={{padding:"9px 0",borderRadius:8,background:username.trim()?"#1D4ED8":"#374151",color:"#fff",fontSize:13,fontWeight:700,border:"none",cursor:"pointer"}}>
+                  Confirm Username
+                </button>
+              </div>
             </div>
           ):(
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
