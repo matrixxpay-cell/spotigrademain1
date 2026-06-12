@@ -496,8 +496,16 @@ function KeyInfoPage({prefillKey="",onRenew}){
       {/* Result */}
       {data&&(
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
-          {/* Declined request banners */}
-          {requests.filter(r=>r.status==="declined").map(r=>(
+          {/* Declined request banners — only show if no newer pending/approved request exists after it */}
+          {requests.filter(r=>{
+            if(r.status!=="declined")return false;
+            const newerActive=requests.some(x=>
+              x._id!==r._id&&
+              (x.status==="pending"||x.status==="approved"||x.status==="processing")&&
+              new Date(x.createdAt)>=new Date(r.createdAt)
+            );
+            return !newerActive;
+          }).map(r=>(
             <div key={r._id} style={{padding:"14px 16px",borderRadius:14,background:C.redLight,
               border:`1px solid ${C.redBorder}`,display:"flex",gap:12,alignItems:"flex-start"}}>
               <span style={{fontSize:20,flexShrink:0}}>❌</span>
