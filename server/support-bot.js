@@ -48,65 +48,58 @@ function randomName() {
   return US_NAMES[Math.floor(Math.random() * US_NAMES.length)];
 }
 
+function offHoursMessage(status) {
+  const pad = n => String(n).padStart(2, "0");
+  const endDisplay = status.endHour === 24 ? "00" : pad(status.endHour);
+  return (
+    `🕐 *Our support team is currently offline.*\n\n` +
+    `Our live agents are available between *${pad(status.startHour)}:00 UTC* and *${endDisplay}:00 UTC*.\n\n` +
+    `To help us assist you as quickly as possible once we're back online:\n\n` +
+    `📝 Please *describe your issue* in brief below\n` +
+    `📸 *Attach a screenshot or screen recording* that illustrates the problem\n\n` +
+    `Your message has been noted and our team will respond as soon as support goes live. We appreciate your patience! 🙏`
+  );
+}
+
+async function handleNewSession(chatId, firstName, status) {
+  if (!status.enabled) {
+    await bot.sendMessage(chatId, "⚠️ *Support is currently disabled.* Please try again later.", { parse_mode: "Markdown" });
+    return false;
+  }
+  if (!status.inHours) {
+    await bot.sendMessage(chatId, offHoursMessage(status), { parse_mode: "Markdown" });
+    // Create offline session so future messages/media are still queued for agent
+    sessions[chatId] = { agentName: null, firstName, history: [], offline: true };
+    saveSessions(sessions);
+    return false;
+  }
+  // Live session — random connecting delay 5–30s
+  await bot.sendMessage(chatId, "⏳ Please wait, connecting you to a Live Agent...");
+  const delay = Math.floor(Math.random() * 26000) + 5000;
+  await new Promise(r => setTimeout(r, delay));
+  const agentName = randomName();
+  sessions[chatId] = { agentName, firstName, history: [], offline: false };
+  saveSessions(sessions);
+  await bot.sendMessage(chatId,
+    `✅ You are now connected with *${agentName}*\n\n_Please wait — our agent will respond shortly._`,
+    { parse_mode: "Markdown" }
+  );
+  return true;
+}
+
 bot.on("message", async (msg) => {
   const chatId    = String(msg.chat.id);
   const text      = msg.text || "";
   const firstName = msg.from.first_name || "User";
 
-  // Forward media from clients to agent
-  if (chatId !== String(AGENT_ID) && !text) {
-    if (!sessions[chatId]) {
-      const status = await getSupportStatus();
-      if (!status.enabled) {
-        bot.sendMessage(chatId, "⚠️ *Support is currently disabled.* Please try again later.", { parse_mode: "Markdown" });
-        return;
-      }
-      if (!status.inHours) {
-        const pad = n => String(n).padStart(2, "0");
-        bot.sendMessage(chatId,
-          `🕐 Sorry, our live agents are not available right now.\n\n⏰ Support hours: *${pad(status.startHour)}:00 UTC – ${pad(status.endHour === 24 ? 0 : status.endHour)}:00 UTC*\n\nPlease try again during support hours.`,
-          { parse_mode: "Markdown" }
-        );
-        return;
-      }
-      await bot.sendMessage(chatId, "⏳ Please wait, connecting you to a Live Agent...");
-      const delay = Math.floor(Math.random() * 26000) + 5000;
-      await new Promise(r => setTimeout(r, delay));
-      const agentName = randomName();
-      sessions[chatId] = { agentName, firstName, history: [] };
-      saveSessions(sessions);
-      await bot.sendMessage(chatId, `✅ You are now connected with *${agentName}*\n\n_Please wait — our agent will respond shortly._`, { parse_mode: "Markdown" });
-    }
-    const caption = `📎 *${firstName}* (ID: \`${chatId}\`)`;
-    if (msg.photo) {
-      const fileId = msg.photo[msg.photo.length - 1].file_id;
-      bot.sendPhoto(AGENT_ID, fileId, { caption, parse_mode: "Markdown" });
-    } else if (msg.video) {
-      bot.sendVideo(AGENT_ID, msg.video.file_id, { caption, parse_mode: "Markdown" });
-    } else if (msg.document) {
-      bot.sendDocument(AGENT_ID, msg.document.file_id, { caption, parse_mode: "Markdown" });
-    } else if (msg.voice) {
-      bot.sendVoice(AGENT_ID, msg.voice.file_id, { caption, parse_mode: "Markdown" });
-    } else if (msg.sticker) {
-      bot.sendMessage(AGENT_ID, `${caption}\n[Sticker]`, { parse_mode: "Markdown" });
-    }
-    return;
-  }
-
-  if (!text) return;
-
-  console.log(`MSG from ${chatId}: ${text}`);
-
-  // ── Agent commands ──────────────────────────────────────────────────────────
+  // ── Agent commands ────────────────────────────────────────────────────────
   if (chatId === String(AGENT_ID)) {
+    if (!text) return;
     if (text.startsWith("/reply ")) {
-      const parts     = text.split(" ");
-      const targetId  = parts[1];
-      const reply     = parts.slice(2).join(" ");
-      if (!targetId || !reply) {
-        bot.sendMessage(AGENT_ID, "Usage: /reply <chatId> <message>");
-        return;
-      }
+      const parts    = text.split(" ");
+      const targetId = parts[1];
+      const reply    = parts.slice(2).join(" ");
+      if (!targetId || !reply) { bot.sendMessage(AGENT_ID, "Usage: /reply <chatId> <message>"); return; }
       try {
         await bot.sendMessage(targetId, `🎧 *Support:* ${reply}`, { parse_mode: "Markdown" });
         if (sessions[targetId]) {
@@ -115,9 +108,7 @@ bot.on("message", async (msg) => {
           saveSessions(sessions);
         }
         bot.sendMessage(AGENT_ID, `✓ Sent to ${sessions[targetId]?.firstName || targetId}`);
-      } catch {
-        bot.sendMessage(AGENT_ID, `⚠️ Could not deliver to ${targetId}`);
-      }
+      } catch { bot.sendMessage(AGENT_ID, `⚠️ Could not deliver to ${targetId}`); }
       return;
     }
     if (text.startsWith("/close ")) {
@@ -125,7 +116,7 @@ bot.on("message", async (msg) => {
       delete sessions[targetId];
       saveSessions(sessions);
       bot.sendMessage(targetId,
-        "✅ Your support session has been closed. Thank you for contacting *SpotiGrader.cc*! Feel free to message us again anytime.",
+        "✅ Your support session has been closed.\n\nThank you for contacting *SpotiGrader.cc*! Feel free to message us again anytime. 🎵",
         { parse_mode: "Markdown" }
       );
       bot.sendMessage(AGENT_ID, `Session with ${targetId} closed.`);
@@ -134,15 +125,14 @@ bot.on("message", async (msg) => {
     if (text === "/sessions") {
       const list = Object.entries(sessions);
       if (list.length === 0) { bot.sendMessage(AGENT_ID, "No active sessions."); return; }
-      const out = list.map(([id, s]) => `• ${s.firstName} (ID: ${id}) — ${s.agentName}`).join("\n");
+      const out = list.map(([id, s]) => `• ${s.firstName} (ID: ${id}) — ${s.offline ? "⏸ offline" : s.agentName}`).join("\n");
       bot.sendMessage(AGENT_ID, `*Active sessions:*\n${out}`, { parse_mode: "Markdown" });
       return;
     }
-    // Ignore other agent messages
     return;
   }
 
-  // ── Client: /start ──────────────────────────────────────────────────────────
+  // ── Client: /start ────────────────────────────────────────────────────────
   if (text === "/start") {
     bot.sendMessage(chatId,
       "👋 *Hi! Welcome to SpotiGrader.cc* 🎵\n\nPlease tell us your query and we'll connect you with a live support agent right away!",
@@ -151,61 +141,48 @@ bot.on("message", async (msg) => {
     return;
   }
 
-  // ── Client: first message — assign agent ────────────────────────────────────
-  if (!sessions[chatId]) {
-    // Check support availability
-    const status = await getSupportStatus();
-    if (!status.enabled) {
-      bot.sendMessage(chatId, "⚠️ *Support is currently disabled.* Please try again later.", { parse_mode: "Markdown" });
-      return;
+  // ── Client: media ─────────────────────────────────────────────────────────
+  if (!text) {
+    if (!sessions[chatId]) {
+      const status = await getSupportStatus();
+      await handleNewSession(chatId, firstName, status);
     }
-    if (!status.inHours) {
-      const pad = n => String(n).padStart(2, "0");
-      bot.sendMessage(chatId,
-        `🕐 Sorry, our live agents are not available right now.\n\n` +
-        `⏰ Support hours: *${pad(status.startHour)}:00 UTC – ${pad(status.endHour === 24 ? 0 : status.endHour)}:00 UTC*\n\n` +
-        `Please try again during support hours.`,
-        { parse_mode: "Markdown" }
-      );
-      return;
-    }
-
-    // Show connecting message with random 5–30s delay
-    await bot.sendMessage(chatId, "⏳ Please wait, connecting you to a Live Agent...");
-    const delay = Math.floor(Math.random() * 26000) + 5000; // 5000–30000ms
-    await new Promise(r => setTimeout(r, delay));
-
-    const agentName = randomName();
-    sessions[chatId] = { agentName, firstName, history: [] };
-    saveSessions(sessions);
-
-    await bot.sendMessage(chatId,
-      `✅ You are now connected with *${agentName}*\n\n_Please wait — our agent will respond shortly._`,
-      { parse_mode: "Markdown" }
-    );
+    if (!sessions[chatId]) return;
+    const caption = `📎 *${firstName}* (ID: \`${chatId}\`)${sessions[chatId].offline ? " ⏸ offline" : ""}`;
+    if (msg.photo)    bot.sendPhoto(AGENT_ID, msg.photo[msg.photo.length-1].file_id, { caption, parse_mode: "Markdown" });
+    else if (msg.video)    bot.sendVideo(AGENT_ID, msg.video.file_id, { caption, parse_mode: "Markdown" });
+    else if (msg.document) bot.sendDocument(AGENT_ID, msg.document.file_id, { caption, parse_mode: "Markdown" });
+    else if (msg.voice)    bot.sendVoice(AGENT_ID, msg.voice.file_id, { caption, parse_mode: "Markdown" });
+    else if (msg.sticker)  bot.sendMessage(AGENT_ID, `${caption}\n[Sticker]`, { parse_mode: "Markdown" });
+    return;
   }
 
-  // Save message to history
+  // ── Client: text message ──────────────────────────────────────────────────
+  console.log(`MSG from ${chatId}: ${text}`);
+
+  if (!sessions[chatId]) {
+    const status = await getSupportStatus();
+    const ok = await handleNewSession(chatId, firstName, status);
+    // If offline session created, still forward the message to agent
+    if (!ok && !sessions[chatId]) return;
+  }
+
+  // Save to history
   if (!sessions[chatId].history) sessions[chatId].history = [];
   sessions[chatId].history.push({ from: "client", text, time: new Date().toISOString() });
-  // Keep last 20 messages
   if (sessions[chatId].history.length > 20) sessions[chatId].history = sessions[chatId].history.slice(-20);
   saveSessions(sessions);
 
-  // ── Forward to agent with history ───────────────────────────────────────────
-  const { agentName, history } = sessions[chatId];
-
-  // Build history string (last 10 messages excluding current)
+  // Forward to agent
+  const { agentName, history, offline } = sessions[chatId];
   const prevMsgs = history.slice(0, -1).slice(-9);
   const historyStr = prevMsgs.length > 0
-    ? "\n\n📜 *Chat History:*\n" + prevMsgs.map(m =>
-        `${m.from === "client" ? "👤" : "🎧"} ${m.text}`
-      ).join("\n")
+    ? "\n\n📜 *Chat History:*\n" + prevMsgs.map(m => `${m.from === "client" ? "👤" : "🎧"} ${m.text}`).join("\n")
     : "";
 
   bot.sendMessage(AGENT_ID,
-    `📩 *${firstName}* (ID: \`${chatId}\`)\n` +
-    `Agent: ${agentName}${historyStr}\n\n` +
+    `📩 *${firstName}* (ID: \`${chatId}\`)${offline ? " ⏸ *[Offline message]*" : ""}\n` +
+    `Agent: ${agentName || "—"}${historyStr}\n\n` +
     `💬 *New:* ${text}\n\n` +
     `→ \`/reply ${chatId} your message\`\n` +
     `→ \`/close ${chatId}\``,
