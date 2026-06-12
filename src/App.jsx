@@ -1521,25 +1521,41 @@ function AdminUpgrades({onShowDecline}){
               {filtered.map(r=>{
                 const accentColor=r.status==="pending"?"#F59E0B":r.status==="approved"?"#10B981":"#EF4444";
                 return(
-                <div key={r._id} onClick={()=>setSelected(r)}
+                <div key={r._id}
                   style={{background:"#161B27",border:"1px solid #1E2536",borderRadius:14,
-                    padding:"16px 20px",cursor:"pointer",transition:"border-color 0.15s",
-                    display:"grid",gridTemplateColumns:"1fr auto",gap:12,alignItems:"center",
-                    borderLeft:`4px solid ${accentColor}`,paddingLeft:16}}
-                  onMouseEnter={e=>e.currentTarget.style.borderColor="#5B21B6"}
-                  onMouseLeave={e=>{e.currentTarget.style.borderColor="#1E2536";e.currentTarget.style.borderLeftColor=accentColor;}}>
-                  <div>
-                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
-                      <span style={{fontFamily:"monospace",fontSize:13,fontWeight:700,color:"#E5E7EB"}}>{r.key}</span>
-                      <Badge status={r.status}/>
+                    padding:"14px 16px",transition:"border-color 0.15s",
+                    borderLeft:`4px solid ${accentColor}`}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}}
+                    onClick={()=>setSelected(r)}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
+                        <span style={{fontFamily:"monospace",fontSize:12,fontWeight:700,color:"#E5E7EB"}}>{r.key}</span>
+                        <Badge status={r.status}/>
+                      </div>
+                      <p style={{margin:0,fontSize:12,color:"#6B7280"}}>
+                        {r.email} · <span style={{color:"#9CA3AF"}}>{fmtRelTime(r.createdAt)}</span>
+                        {r.confirmedUsername&&<> · @{r.confirmedUsername}</>}
+                      </p>
+                      {r.declineReason&&<p style={{margin:"3px 0 0",fontSize:11,color:"#F87171"}}>Reason: {r.declineReason}</p>}
                     </div>
-                    <p style={{margin:0,fontSize:12,color:"#6B7280"}}>
-                      {r.email} · <span style={{color:"#9CA3AF"}}>{fmtRelTime(r.createdAt)}</span>
-                      {r.confirmedUsername&&<> · @{r.confirmedUsername}</>}
-                    </p>
-                    {r.declineReason&&<p style={{margin:"3px 0 0",fontSize:11,color:"#F87171"}}>Reason: {r.declineReason}</p>}
+                    <span style={{color:"#6B7280",fontSize:16,fontWeight:700,flexShrink:0}}>→</span>
                   </div>
-                  <span style={{color:"#6B7280",fontSize:16,fontWeight:700}}>→</span>
+                  {r.status==="pending"&&(
+                    <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #1E2536",display:"flex",gap:8}}>
+                      <button onClick={e=>{e.stopPropagation();setSelected(r);}}
+                        style={{flex:1,padding:"7px 0",borderRadius:8,background:"rgba(91,33,182,0.2)",color:"#A78BFA",fontSize:12,fontWeight:700,border:"1px solid #5B21B6",cursor:"pointer"}}>
+                        Open →
+                      </button>
+                      <button onClick={e=>{e.stopPropagation();onShowDecline&&onShowDecline({onConfirm:async(reason)=>{
+                        await api.updateUpgradeRequest(r._id,{status:"declined",declineReason:reason});
+                        const k=await api.getKey(r.key);if(k)await api.updateKey(k._id,{status:"available"});
+                        refresh();
+                      }});}}
+                        style={{flex:1,padding:"7px 0",borderRadius:8,background:"rgba(220,38,38,0.15)",color:"#F87171",fontSize:12,fontWeight:700,border:"1px solid #991B1B",cursor:"pointer"}}>
+                        ✕ Decline
+                      </button>
+                    </div>
+                  )}
                 </div>
                 );
               })}
@@ -1766,23 +1782,39 @@ function AdminRenewals({onShowDecline}){
               {filtered.map(r=>{
                 const accentColor=r.status==="pending"?"#F59E0B":r.status==="approved"?"#10B981":"#EF4444";
                 return(
-                <div key={r._id} onClick={()=>setSelected(r)}
+                <div key={r._id}
                   style={{background:"#161B27",border:"1px solid #1E2536",borderRadius:14,
-                    padding:"16px 20px",cursor:"pointer",transition:"border-color 0.15s",
-                    display:"grid",gridTemplateColumns:"1fr auto",gap:12,alignItems:"center",
-                    borderLeft:`4px solid ${accentColor}`,paddingLeft:16}}
-                  onMouseEnter={e=>e.currentTarget.style.borderColor="#059669"}
-                  onMouseLeave={e=>{e.currentTarget.style.borderColor="#1E2536";e.currentTarget.style.borderLeftColor=accentColor;}}>
-                  <div>
-                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
-                      <span style={{fontFamily:"monospace",fontSize:13,fontWeight:700,color:"#E5E7EB"}}>{r.key}</span>
-                      <Badge status={r.status}/>
-                      {r.proofStatus&&<Badge status={r.proofStatus==="confirmed"?"approved":"declined"}/>}
+                    padding:"14px 16px",transition:"border-color 0.15s",
+                    borderLeft:`4px solid ${accentColor}`}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}}
+                    onClick={()=>setSelected(r)}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
+                        <span style={{fontFamily:"monospace",fontSize:12,fontWeight:700,color:"#E5E7EB"}}>{r.key}</span>
+                        <Badge status={r.status}/>
+                        {r.proofStatus&&<Badge status={r.proofStatus==="confirmed"?"approved":"declined"}/>}
+                      </div>
+                      <p style={{margin:0,fontSize:12,color:"#6B7280"}}>{r.oldEmail} → {r.newEmail} · <span style={{color:"#9CA3AF"}}>{fmtRelTime(r.createdAt)}</span></p>
+                      {r.declineReason&&<p style={{margin:"3px 0 0",fontSize:11,color:"#F87171"}}>Reason: {r.declineReason}</p>}
                     </div>
-                    <p style={{margin:0,fontSize:12,color:"#6B7280"}}>{r.oldEmail} → {r.newEmail} · <span style={{color:"#9CA3AF"}}>{fmtRelTime(r.createdAt)}</span></p>
-                    {r.declineReason&&<p style={{margin:"3px 0 0",fontSize:11,color:"#F87171"}}>Reason: {r.declineReason}</p>}
+                    <span style={{color:"#6B7280",fontSize:16,fontWeight:700,flexShrink:0}}>→</span>
                   </div>
-                  <span style={{color:"#6B7280",fontSize:16,fontWeight:700}}>→</span>
+                  {r.status==="pending"&&(
+                    <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #1E2536",display:"flex",gap:8}}>
+                      <button onClick={e=>{e.stopPropagation();setSelected(r);}}
+                        style={{flex:1,padding:"7px 0",borderRadius:8,background:"rgba(5,150,105,0.15)",color:"#6EE7B7",fontSize:12,fontWeight:700,border:"1px solid #059669",cursor:"pointer"}}>
+                        Open →
+                      </button>
+                      <button onClick={e=>{e.stopPropagation();onShowDecline&&onShowDecline({onConfirm:async(reason)=>{
+                        await api.updateRenewRequest(r._id,{status:"declined",declineReason:reason});
+                        const k=await api.getKey(r.key);if(k)await api.updateKey(k._id,{status:"used_upgrade"});
+                        refresh();
+                      }});}}
+                        style={{flex:1,padding:"7px 0",borderRadius:8,background:"rgba(220,38,38,0.15)",color:"#F87171",fontSize:12,fontWeight:700,border:"1px solid #991B1B",cursor:"pointer"}}>
+                        ✕ Decline
+                      </button>
+                    </div>
+                  )}
                 </div>
                 );
               })}
@@ -2539,18 +2571,30 @@ function MakerPanel({maker,onLogout}){
                 filteredU.length===0?<div style={{padding:"40px 0",textAlign:"center",color:DM,fontSize:14}}>No {upgradeTab} requests.</div>:(
                   <div style={{display:"flex",flexDirection:"column",gap:8}}>
                     {filteredU.map(r=>(
-                      <div key={r._id} onClick={()=>setSelectedUpgrade(r)}
-                        style={{background:DS,border:`1px solid ${DB}`,borderRadius:12,padding:"14px 18px",cursor:"pointer",display:"grid",gridTemplateColumns:"1fr auto",gap:12,alignItems:"center"}}
-                        onMouseEnter={e=>e.currentTarget.style.borderColor="#10B981"}
-                        onMouseLeave={e=>e.currentTarget.style.borderColor=DB}>
-                        <div>
-                          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
-                            <span style={{fontFamily:"monospace",fontSize:13,fontWeight:700,color:DT}}>{r.key}</span>
-                            <Badge status={r.status}/>
+                      <div key={r._id} style={{background:DS,border:`1px solid ${DB}`,borderRadius:12,padding:"12px 16px"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}} onClick={()=>setSelectedUpgrade(r)}>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
+                              <span style={{fontFamily:"monospace",fontSize:12,fontWeight:700,color:DT}}>{r.key}</span>
+                              <Badge status={r.status}/>
+                            </div>
+                            <p style={{margin:0,fontSize:12,color:DM}}>{r.email} · {fmtRelTime(r.createdAt)}</p>
+                            {r.declineReason&&<p style={{margin:"3px 0 0",fontSize:11,color:"#F87171"}}>Reason: {r.declineReason}</p>}
                           </div>
-                          <p style={{margin:0,fontSize:12,color:DM}}>{r.email} · {fmtDate(r.createdAt)}</p>
+                          <span style={{color:DM,fontSize:16,flexShrink:0}}>›</span>
                         </div>
-                        <span style={{color:DM,fontSize:18}}>›</span>
+                        {r.status==="pending"&&(
+                          <div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${DB}`,display:"flex",gap:8}}>
+                            <button onClick={()=>setSelectedUpgrade(r)}
+                              style={{flex:1,padding:"6px 0",borderRadius:7,background:"rgba(16,185,129,0.15)",color:"#6EE7B7",fontSize:11,fontWeight:700,border:`1px solid #059669`,cursor:"pointer"}}>
+                              Open →
+                            </button>
+                            <button onClick={()=>setShowDecline({type:"upgrade",req:r})}
+                              style={{flex:1,padding:"6px 0",borderRadius:7,background:"rgba(220,38,38,0.15)",color:"#F87171",fontSize:11,fontWeight:700,border:"1px solid #991B1B",cursor:"pointer"}}>
+                              ✕ Decline
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -2570,18 +2614,30 @@ function MakerPanel({maker,onLogout}){
                 filteredR.length===0?<div style={{padding:"40px 0",textAlign:"center",color:DM,fontSize:14}}>No {renewTab} requests.</div>:(
                   <div style={{display:"flex",flexDirection:"column",gap:8}}>
                     {filteredR.map(r=>(
-                      <div key={r._id} onClick={()=>setSelectedRenew(r)}
-                        style={{background:DS,border:`1px solid ${DB}`,borderRadius:12,padding:"14px 18px",cursor:"pointer",display:"grid",gridTemplateColumns:"1fr auto",gap:12,alignItems:"center"}}
-                        onMouseEnter={e=>e.currentTarget.style.borderColor="#10B981"}
-                        onMouseLeave={e=>e.currentTarget.style.borderColor=DB}>
-                        <div>
-                          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
-                            <span style={{fontFamily:"monospace",fontSize:13,fontWeight:700,color:DT}}>{r.key}</span>
-                            <Badge status={r.status}/>
+                      <div key={r._id} style={{background:DS,border:`1px solid ${DB}`,borderRadius:12,padding:"12px 16px"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}} onClick={()=>setSelectedRenew(r)}>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
+                              <span style={{fontFamily:"monospace",fontSize:12,fontWeight:700,color:DT}}>{r.key}</span>
+                              <Badge status={r.status}/>
+                            </div>
+                            <p style={{margin:0,fontSize:12,color:DM}}>{r.oldEmail} → {r.newEmail} · {fmtRelTime(r.createdAt)}</p>
+                            {r.declineReason&&<p style={{margin:"3px 0 0",fontSize:11,color:"#F87171"}}>Reason: {r.declineReason}</p>}
                           </div>
-                          <p style={{margin:0,fontSize:12,color:DM}}>{r.oldEmail} → {r.newEmail} · {fmtDate(r.createdAt)}</p>
+                          <span style={{color:DM,fontSize:16,flexShrink:0}}>›</span>
                         </div>
-                        <span style={{color:DM,fontSize:18}}>›</span>
+                        {r.status==="pending"&&(
+                          <div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${DB}`,display:"flex",gap:8}}>
+                            <button onClick={()=>setSelectedRenew(r)}
+                              style={{flex:1,padding:"6px 0",borderRadius:7,background:"rgba(16,185,129,0.15)",color:"#6EE7B7",fontSize:11,fontWeight:700,border:`1px solid #059669`,cursor:"pointer"}}>
+                              Open →
+                            </button>
+                            <button onClick={()=>setShowDecline({type:"renew",req:r})}
+                              style={{flex:1,padding:"6px 0",borderRadius:7,background:"rgba(220,38,38,0.15)",color:"#F87171",fontSize:11,fontWeight:700,border:"1px solid #991B1B",cursor:"pointer"}}>
+                              ✕ Decline
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
