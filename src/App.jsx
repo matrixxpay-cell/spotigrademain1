@@ -786,14 +786,13 @@ function UpgradePage({onViewStatus,onAdminLogin,onMakerLogin}){
 // ════════════════════════════════════════════════════════════════════════════
 //  RENEW PAGE
 // ════════════════════════════════════════════════════════════════════════════
-const STATIC_ADMIN_USERNAME="spotify_user_4821";
-
 function RenewPage({onViewStatus,prefillKey=""}){
   const [step,setStep]=useState(0);
   const [key,setKey]=useState(prefillKey);
   const [oldEmail,setOldEmail]=useState("");
   const [oldPass,setOldPass]=useState("");
   const [showModal,setShowModal]=useState(false);
+  const [linkedUsername,setLinkedUsername]=useState("");
   const [newEmail,setNewEmail]=useState("");
   const [newPass,setNewPass]=useState("");
   const [files,setFiles]=useState([]);
@@ -812,6 +811,7 @@ function RenewPage({onViewStatus,prefillKey=""}){
       if(k.cooldownUntil&&new Date(k.cooldownUntil)>new Date()){
         setKeyErr(`Key is on cooldown for ${cooldownLeft(k.cooldownUntil)} more.`);return;
       }
+      setLinkedUsername(k.usedByUsername||"");
       setStep(1);
     }catch(e){setKeyErr("Server error. Please try again.");}
     finally{setLoading(false);}
@@ -831,7 +831,7 @@ function RenewPage({onViewStatus,prefillKey=""}){
     finally{setLoading(false);}
   };
 
-  const reset=()=>{setStep(0);setKey(prefillKey||"");setOldEmail("");setOldPass("");setNewEmail("");setNewPass("");setFiles([]);setCountry("");setSubmitted(false);setKeyErr("");};
+  const reset=()=>{setStep(0);setKey(prefillKey||"");setOldEmail("");setOldPass("");setNewEmail("");setNewPass("");setFiles([]);setCountry("");setSubmitted(false);setKeyErr("");setLinkedUsername("");};
 
   if(submitted)return <ProcessingScreen type="renew" keyStr={key} onViewStatus={()=>onViewStatus(key)} onBack={reset}/>;
 
@@ -851,7 +851,7 @@ function RenewPage({onViewStatus,prefillKey=""}){
               padding:"16px 20px",marginBottom:22}}>
               <p style={{margin:"0 0 3px",fontSize:10,fontWeight:800,color:C.textMuted,
                 letterSpacing:"0.12em",textTransform:"uppercase"}}>Spotify Username</p>
-              <p style={{margin:"0 0 4px",fontSize:22,fontWeight:900,color:C.text}}>@{STATIC_ADMIN_USERNAME}</p>
+              <p style={{margin:"0 0 4px",fontSize:22,fontWeight:900,color:C.text}}>@{linkedUsername}</p>
               <p style={{margin:0,fontSize:11,color:C.textMuted}}>Retrieved from admin records</p>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
@@ -922,7 +922,7 @@ function RenewPage({onViewStatus,prefillKey=""}){
               <span style={{color:C.green,fontWeight:800}}>✓</span>
               <div>
                 <p style={{margin:0,fontSize:11,color:C.green,fontWeight:700}}>Account Verified</p>
-                <p style={{margin:0,fontSize:12,color:C.greenText}}>@{STATIC_ADMIN_USERNAME}</p>
+                <p style={{margin:0,fontSize:12,color:C.greenText}}>@{linkedUsername}</p>
               </div>
             </div>
             <Field label="New Email" placeholder="new@email.com" value={newEmail} onChange={setNewEmail}/>
