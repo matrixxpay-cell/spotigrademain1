@@ -2976,6 +2976,7 @@ export default function App(){
         }
         .admin-mobile-tabs{display:none;}
         @media(max-width:700px){.uptime-bars{display:none!important;}}
+        @media(max-width:640px){.site-footer{margin-bottom:72px!important;}}
         @media(max-width:480px){
           .three-col{grid-template-columns:1fr!important;}
           .stat-grid{grid-template-columns:1fr 1fr!important;}
@@ -3038,7 +3039,7 @@ export default function App(){
         {page==="status"&&<StatusPage/>}
       </main>
 
-      <footer style={{borderTop:`1px solid ${C.border}`,marginTop:20}}>
+      <footer style={{borderTop:`1px solid ${C.border}`,marginTop:20,paddingBottom:"env(safe-area-inset-bottom)"}} className="site-footer">
         <div style={{maxWidth:900,margin:"0 auto",padding:"20px",
           display:"flex",flexWrap:"wrap",alignItems:"center",justifyContent:"space-between",gap:12}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
