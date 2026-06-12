@@ -1126,7 +1126,7 @@ function RenewPage({onViewStatus,prefillKey=""}){
 // ════════════════════════════════════════════════════════════════════════════
 //  ADMIN PANEL
 // ════════════════════════════════════════════════════════════════════════════
-function AdminPanel({onLogout}){
+function AdminPanel({onLogout,onGoClient}){
   const [tab,setTab]=useState("keys");
   const [showDecline,setShowDecline]=useState(null);
   const [stats,setStats]=useState({keys:0,upgrades:0,renewals:0,payouts:0});
@@ -1198,6 +1198,7 @@ function AdminPanel({onLogout}){
             </button>
           ))}
           <div style={{flex:1}}/>
+          {onGoClient&&<button onClick={onGoClient} style={{margin:"0 20px 8px",padding:"9px 0",borderRadius:8,background:"rgba(91,33,182,0.15)",color:"#A78BFA",fontSize:12,fontWeight:600,border:"1px solid #5B21B6",cursor:"pointer"}}>🌐 Client Panel</button>}
           {onLogout&&<button onClick={onLogout} style={{margin:"0 20px",padding:"9px 0",borderRadius:8,background:"#1F2937",color:"#9CA3AF",fontSize:12,fontWeight:600,border:"1px solid #374151",cursor:"pointer"}}>← Logout</button>}
         </div>
         {/* Content */}
@@ -1804,7 +1805,7 @@ function AdminUpgrades({onShowDecline}){
                         Open →
                       </button>
                       <button onClick={e=>{e.stopPropagation();onShowDecline&&onShowDecline({onConfirm:async(reason)=>{
-                        await api.updateUpgradeRequest(r._id,{status:"declined",declineReason:reason});
+                        await api.updateUpgradeRequest(r._id,{status:"declined",declineReason:reason,processedBy:"admin"});
                         const k=await api.getKey(r.key);if(k)await api.updateKey(k._id,{status:"available"});
                         refresh();
                       }});}}
@@ -1837,7 +1838,7 @@ function AdminUpgradeDetail({req,onBack,onRefresh,onShowDecline}){
   const [r,setR]=useState(req);
   const [makers,setMakers]=useState([]);
   useEffect(()=>{api.getMakers().then(setMakers).catch(()=>{});},[]);
-  const processorName=(id)=>{if(!id)return null;const m=makers.find(x=>x._id===id);return m?`Maker: ${m.name}`:"Admin";};
+  const processorName=(id)=>{if(!id)return null;if(id==="admin")return"Admin";const m=makers.find(x=>x._id===id);return m?`Maker: ${m.name}`:"Admin";};
 
   const confirmUsername=async()=>{
     if(!username.trim())return;
@@ -1863,7 +1864,7 @@ function AdminUpgradeDetail({req,onBack,onRefresh,onShowDecline}){
       }
       await api.updateUpgradeRequest(r._id,{
         status:"approved",confirmedUsername:username.trim(),
-        upgradeType,plan,duration,address,countryUpgraded:country,
+        upgradeType,plan,duration,address,countryUpgraded:country,processedBy:"admin",
       });
       setDone(true);onRefresh();
     }finally{setLoading(false);}
@@ -1871,7 +1872,7 @@ function AdminUpgradeDetail({req,onBack,onRefresh,onShowDecline}){
 
   const handleDecline=()=>{
     onShowDecline&&onShowDecline({onConfirm:async(reason)=>{
-      await api.updateUpgradeRequest(r._id,{status:"declined",declineReason:reason});
+      await api.updateUpgradeRequest(r._id,{status:"declined",declineReason:reason,processedBy:"admin"});
       const k=await api.getKey(r.key);
       if(k)await api.updateKey(k._id,{status:"available"});
       onBack();onRefresh();
@@ -2098,7 +2099,7 @@ function AdminRenewals({onShowDecline}){
                         Open →
                       </button>
                       <button onClick={e=>{e.stopPropagation();onShowDecline&&onShowDecline({onConfirm:async(reason)=>{
-                        await api.updateRenewRequest(r._id,{status:"declined",declineReason:reason});
+                        await api.updateRenewRequest(r._id,{status:"declined",declineReason:reason,processedBy:"admin"});
                         const k=await api.getKey(r.key);if(k)await api.updateKey(k._id,{status:"used_upgrade"});
                         refresh();
                       }});}}
@@ -2140,7 +2141,7 @@ function AdminRenewDetail({req,onBack,onRefresh,onShowDecline}){
     api.getKey(r.key).then(k=>setOriginalUsername(k?.usedByUsername||null)).catch(()=>{});
     api.getMakers().then(setMakers).catch(()=>{});
   },[r.key]);
-  const processorName=(id)=>{if(!id)return null;const m=makers.find(x=>x._id===id);return m?`Maker: ${m.name}`:"Admin";};
+  const processorName=(id)=>{if(!id)return null;if(id==="admin")return"Admin";const m=makers.find(x=>x._id===id);return m?`Maker: ${m.name}`:"Admin";};
 
   const checkUsername=async()=>{
     setUsernameError("");
@@ -2175,14 +2176,14 @@ function AdminRenewDetail({req,onBack,onRefresh,onShowDecline}){
           plan,upgradeType,address:address||null,
         });
       }
-      await api.updateRenewRequest(r._id,{status:"approved",upgradeType,plan,address,countryUpgraded:renewCountry});
+      await api.updateRenewRequest(r._id,{status:"approved",upgradeType,plan,address,countryUpgraded:renewCountry,processedBy:"admin"});
       setDone(true);onRefresh();
     }finally{setLoading(false);}
   };
 
   const handleDecline=()=>{
     onShowDecline&&onShowDecline({onConfirm:async(reason)=>{
-      await api.updateRenewRequest(r._id,{status:"declined",declineReason:reason});
+      await api.updateRenewRequest(r._id,{status:"declined",declineReason:reason,processedBy:"admin"});
       const k=await api.getKey(r.key);
       if(k)await api.updateKey(k._id,{status:"used_upgrade"});
       onBack();onRefresh();
@@ -3549,7 +3550,7 @@ export default function App(){
   const logoutAdmin=()=>{localStorage.removeItem("role");setIsAdmin(false);};
   const logoutMaker=()=>{localStorage.removeItem("maker");setMaker(null);};
 
-  if(isAdmin)return <AdminPanel onLogout={logoutAdmin}/>;
+  if(isAdmin)return <AdminPanel onLogout={logoutAdmin} onGoClient={()=>setIsAdmin(false)}/>;
   if(maker)return <MakerPanel maker={maker} onLogout={logoutMaker}/>;
 
   return(
@@ -3618,6 +3619,15 @@ export default function App(){
                 <span style={{fontSize:13}}>{emoji}</span><span className="nav-label">{label}</span>
               </button>
             ))}
+            {localStorage.getItem("role")==="admin"&&(
+              <button onClick={()=>setIsAdmin(true)} style={{
+                display:"flex",alignItems:"center",gap:5,padding:"6px 12px",borderRadius:9,
+                fontSize:12,fontWeight:700,cursor:"pointer",
+                background:"rgba(91,33,182,0.15)",color:C.violet,
+                border:`1px solid ${C.violet}40`,transition:"all 0.15s"}}>
+                <span style={{fontSize:13}}>🛡️</span><span className="nav-label">Admin</span>
+              </button>
+            )}
           </div>
         </div>
       </nav>
