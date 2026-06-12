@@ -1664,9 +1664,9 @@ function StatusPage(){
   );
 
   const services=[
-    {key:"service",  label:"Web Service",    icon:"🌐", desc:"GitHub Pages frontend"},
-    {key:"api",      label:"API Server",      icon:"⚙️", desc:"Express REST API · port 3001"},
-    {key:"database", label:"MongoDB Database",icon:"🗄️", desc:"SpotigraderSagar · 45.13.239.204"},
+    {key:"service",  label:"Web Service", icon:"🌐"},
+    {key:"api",      label:"API Server",  icon:"⚙️"},
+    {key:"database", label:"Database",    icon:"🗄️"},
   ];
 
   return(
@@ -1706,7 +1706,7 @@ function StatusPage(){
 
       {/* Service cards */}
       <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:28}}>
-        {services.map(({key,label,icon,desc})=>{
+        {services.map(({key,label,icon})=>{
           const s=data?.[key];
           const st=statusStyle(s?.status||"down");
           return(
@@ -1730,7 +1730,6 @@ function StatusPage(){
                       <span style={{fontSize:11,color:C.textMuted,fontWeight:600}}>{fmtMs(s.latency)}</span>
                     )}
                   </div>
-                  <p style={{margin:0,fontSize:12,color:C.textMuted}}>{desc}</p>
                 </div>
                 <div style={{textAlign:"right",flexShrink:0}}>
                   <p style={{margin:"0 0 4px",fontSize:10,fontWeight:700,color:C.textMuted,
