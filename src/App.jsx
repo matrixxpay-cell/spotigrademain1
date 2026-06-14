@@ -3650,7 +3650,63 @@ function MakerPanel({maker,onLogout}){
               )}
             </div>
           )}
-        </div>
+
+          {tab==="stats"&&(
+            <div>
+              <h2 style={{margin:"0 0 4px",fontSize:22,fontWeight:900,color:DT}}>My Performance Stats</h2>
+              <p style={{margin:"0 0 20px",fontSize:13,color:DM}}>Based on all requests you have processed</p>
+              {(()=>{
+                const myU=upgrades.filter(r=>r.processedBy===maker._id);
+                const myR=renewals.filter(r=>r.processedBy===maker._id);
+                const allReqsMaker=[...myU,...myR];
+                const mApproved=allReqsMaker.filter(r=>r.status==="approved");
+                const mDeclined=allReqsMaker.filter(r=>r.status==="declined");
+                const mTotal=mApproved.length+mDeclined.length;
+                const mRate=mTotal>0?Math.round(mApproved.length/mTotal*100):0;
+                const mAvgMs=mApproved.length>0?mApproved.reduce((s,r)=>s+(new Date(r.updatedAt)-new Date(r.createdAt)),0)/mApproved.length:0;
+                const mAvgMin=Math.round(mAvgMs/60000);
+                return(
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:14}}>
+                    {[
+                      {label:"Total Approved",value:mApproved.length,icon:"✓",color:"#6EE7B7",bg:"rgba(5,150,105,0.15)"},
+                      {label:"Total Declined",value:mDeclined.length,icon:"✕",color:"#F87171",bg:"rgba(220,38,38,0.12)"},
+                      {label:"Approval Rate",value:mRate+"%",icon:"📈",color:"#A78BFA",bg:"rgba(124,58,237,0.15)"},
+                      {label:"Avg Process Time",value:mAvgMin>0?mAvgMin+" min":"—",icon:"⏱",color:"#FCD34D",bg:"rgba(245,158,11,0.12)"},
+                    ].map(({label,value,icon,color,bg})=>(
+                      <div key={label} style={{background:DS,border:`1px solid ${DB}`,borderRadius:14,padding:"20px",textAlign:"center"}}>
+                        <div style={{width:44,height:44,borderRadius:12,background:bg,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 10px",fontSize:20}}>{icon}</div>
+                        <p style={{margin:"0 0 4px",fontSize:24,fontWeight:900,color}}>{value}</p>
+                        <p style={{margin:0,fontSize:12,color:DM,fontWeight:600}}>{label}</p>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+          {tab==="payouthistory"&&(
+            <div>
+              <h2 style={{margin:"0 0 4px",fontSize:22,fontWeight:900,color:DT}}>Payout History</h2>
+              <p style={{margin:"0 0 20px",fontSize:13,color:DM}}>All payouts for your account</p>
+              {payouts.length===0?(
+                <div style={{padding:"40px 0",textAlign:"center",color:DM,fontSize:14}}>No payout history yet.</div>
+              ):(
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {payouts.map(p=>(
+                    <div key={p._id} style={{background:DS,border:`1px solid ${DB}`,borderRadius:12,padding:"14px 18px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+                      <div>
+                        <p style={{margin:"0 0 2px",fontSize:14,fontWeight:700,color:DT}}>${p.amount.toFixed(2)} via {p.method.toUpperCase()}</p>
+                        <p style={{margin:"0 0 1px",fontSize:12,color:DM}}>{p.address}</p>
+                        <p style={{margin:0,fontSize:11,color:"#4B5563"}}>{fmtDate(p.createdAt)}</p>
+                        {p.txnId&&<p style={{margin:"3px 0 0",fontSize:11,color:"#6EE7B7"}}>TXN: {p.txnId}</p>}
+                      </div>
+                      <span style={{fontSize:12,fontWeight:800,color:p.status==="paid"?"#6EE7B7":p.status==="rejected"?"#F87171":"#FCD34D",padding:"4px 10px",borderRadius:6,background:p.status==="paid"?"rgba(5,150,105,0.15)":p.status==="rejected"?"rgba(220,38,38,0.12)":"rgba(245,158,11,0.12)"}}>{p.status.toUpperCase()}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}        </div>
       </div>
     </div>
   );
