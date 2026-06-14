@@ -2836,10 +2836,13 @@ function AdminSettings(){
             <button onClick={async()=>{
                 setSmtpTest("testing");
                 try{
-                  const r=await fetch("/api/settings/test-smtp",{method:"POST"});
+                  const ctrl=new AbortController();
+                  const tid=setTimeout(()=>ctrl.abort(),15000);
+                  const r=await fetch("/api/settings/test-smtp",{method:"POST",signal:ctrl.signal});
+                  clearTimeout(tid);
                   const j=await r.json();
                   setSmtpTest(r.ok?"ok":"error:"+j.error);
-                }catch(e){setSmtpTest("error:"+e.message);}
+                }catch(e){setSmtpTest("error:"+(e.name==="AbortError"?"Request timed out":e.message));}
               }}
               disabled={smtpTest==="testing"}
               style={{padding:"9px 0",borderRadius:8,border:"none",cursor:"pointer",fontSize:13,fontWeight:700,

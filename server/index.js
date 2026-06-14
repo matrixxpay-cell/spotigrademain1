@@ -301,20 +301,24 @@ app.patch("/api/settings", async (req, res) => {
 });
 
 app.post("/api/settings/test-smtp", async (req, res) => {
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error("Connection timed out after 10s")), 10000)
+  );
   try {
     const s = await getSettings();
     if (!s.smtpHost || !s.smtpUser) return res.status(400).json({ error: "SMTP not configured." });
     const transporter = require("nodemailer").createTransport({
       host: s.smtpHost, port: s.smtpPort, secure: s.smtpPort === 465,
       auth: { user: s.smtpUser, pass: s.smtpPass },
+      connectionTimeout: 8000, greetingTimeout: 8000, socketTimeout: 8000,
     });
-    await transporter.verify();
-    await transporter.sendMail({
+    await Promise.race([transporter.verify(), timeout]);
+    await Promise.race([transporter.sendMail({
       from: s.smtpFrom || s.smtpUser,
       to: s.smtpUser,
       subject: "Spotigrader SMTP Test",
       html: "<p>✅ Your SMTP configuration is working correctly.</p>",
-    });
+    }), timeout]);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
