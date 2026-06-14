@@ -29,10 +29,18 @@ const api = {
   getUpgradeRequests:    ()      => fetch(`${API}/upgrade-requests`).then(r=>r.json()),
   createUpgradeRequest:  (data)  => fetch(`${API}/upgrade-requests`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)}).then(r=>r.json()),
   updateUpgradeRequest:  (id,d)  => fetch(`${API}/upgrade-requests/${id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}).then(r=>r.json()),
+  deleteUpgradeRequest:  (id)    => fetch(`${API}/upgrade-requests/${id}`,{method:"DELETE"}).then(r=>r.json()),
+  bulkDeleteUpgradeRequests:(ids)=> fetch(`${API}/upgrade-requests`,{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({ids})}).then(r=>r.json()),
   // RENEW REQUESTS
   getRenewRequests:    ()      => fetch(`${API}/renew-requests`).then(r=>r.json()),
   createRenewRequest:  (data)  => fetch(`${API}/renew-requests`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)}).then(r=>r.json()),
   updateRenewRequest:  (id,d)  => fetch(`${API}/renew-requests/${id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}).then(r=>r.json()),
+  deleteRenewRequest:  (id)    => fetch(`${API}/renew-requests/${id}`,{method:"DELETE"}).then(r=>r.json()),
+  bulkDeleteRenewRequests:(ids)=> fetch(`${API}/renew-requests`,{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({ids})}).then(r=>r.json()),
+  // AUDIT LOGS
+  getAuditLogs: () => fetch(`${API}/audit-logs`).then(r=>r.json()),
+  // CSV EXPORT — returns URL; trigger with anchor
+  exportCSV: (type) => `${API}/export/${type}`,
   // MAKERS
   getMakers:     ()    => fetch(`${API}/makers`).then(r=>r.json()),
   createMaker:   (d)   => fetch(`${API}/makers`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}).then(r=>r.json()),
@@ -55,6 +63,14 @@ const api = {
     return fetch(`${API}/upload`, { method:"POST", body:fd }).then(r=>r.json());
   },
 };
+
+// ─── CSV DOWNLOAD HELPER ──────────────────────────────────────────────────────
+function downloadCSV(type){
+  const a=document.createElement("a");
+  a.href=api.exportCSV(type);
+  a.download=`${type}.csv`;
+  document.body.appendChild(a);a.click();a.remove();
+}
 
 // ─── SHARED UI ────────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
@@ -411,6 +427,52 @@ function fmtRelTime(iso){
   return`${days} day${days===1?"":"s"} ago`;
 }
 
+// ─── REQUEST HISTORY (timeline) ───────────────────────────────────────────────
+function RequestHistorySection({requests}){
+  const [open,setOpen]=useState(false);
+  const sorted=[...requests].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+  return(
+    <Card style={{padding:0,overflow:"hidden"}}>
+      <button onClick={()=>setOpen(o=>!o)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",
+        padding:"16px 20px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <span style={{fontSize:14,fontWeight:800,color:C.text}}>📋 Request History ({sorted.length})</span>
+        <span style={{fontSize:11,color:C.textMuted,transform:open?"rotate(180deg)":"none",transition:"transform 0.2s"}}>▼</span>
+      </button>
+      {open&&(
+        <div style={{padding:"0 20px 18px"}}>
+          {sorted.length===0?(
+            <p style={{margin:0,fontSize:13,color:C.textMuted}}>No requests found for this key.</p>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {sorted.map(r=>(
+                <div key={r._id} style={{display:"flex",gap:12,padding:"12px 14px",borderRadius:12,
+                  background:C.surfaceAlt,border:`1px solid ${C.border}`}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
+                      <span style={{padding:"2px 9px",borderRadius:999,fontSize:11,fontWeight:700,
+                        background:r._type==="renew"?C.greenLight:C.violetLight,
+                        color:r._type==="renew"?C.greenText:C.violet}}>
+                        {r._type==="renew"?"Renew":"Upgrade"}
+                      </span>
+                      <Badge status={r.status}/>
+                      <span style={{fontSize:11,color:C.textMuted}}>{fmtDate(r.createdAt)}</span>
+                    </div>
+                    <p style={{margin:0,fontSize:12,color:C.textSub}}>
+                      {r.plan?<>Plan: <strong>{r.plan.replace(/_/g," ")}</strong> · </>:null}
+                      {r.processedBy?<>Processed by {r.processedBy==="admin"?"Admin":"Maker"}</>:"Awaiting processing"}
+                    </p>
+                    {r.declineReason&&<p style={{margin:"3px 0 0",fontSize:11,color:C.red}}>Reason: {r.declineReason}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 //  KEY INFO PAGE
 // ════════════════════════════════════════════════════════════════════════════
@@ -522,6 +584,8 @@ function KeyInfoPage({prefillKey="",onRenew}){
               </div>
             </div>
           ))}
+          {/* Request History timeline */}
+          {requests.length>0&&<RequestHistorySection requests={requests}/>}
           {/* Status banner */}
           {data.displayStatus==="cooldown"&&(
             <InfoBox type="warn">
@@ -1130,7 +1194,7 @@ function RenewPage({onViewStatus,prefillKey=""}){
 //  ADMIN PANEL
 // ════════════════════════════════════════════════════════════════════════════
 function AdminPanel({onLogout,onGoClient}){
-  const [tab,setTab]=useState("keys");
+  const [tab,setTab]=useState("overview");
   const [showDecline,setShowDecline]=useState(null);
   const [stats,setStats]=useState({keys:0,upgrades:0,renewals:0,payouts:0});
 
@@ -1151,11 +1215,13 @@ function AdminPanel({onLogout,onGoClient}){
   },[]);
 
   const NAV_ITEMS=[
+    {id:"overview",label:"Overview",icon:"📊",badge:null},
     {id:"keys",label:"Key Management",icon:"🔑",badge:null},
     {id:"upgrades",label:"Upgrade Requests",icon:"⚡",badge:stats.upgrades||null,badgeColor:"#F59E0B"},
     {id:"renewals",label:"Renewal Requests",icon:"🔄",badge:stats.renewals||null,badgeColor:"#10B981"},
     {id:"makers",label:"Manage Makers",icon:"👥",badge:null},
     {id:"payouts",label:"Payout Queue",icon:"💸",badge:stats.payouts||null,badgeColor:"#F59E0B"},
+    {id:"auditlog",label:"Audit Log",icon:"📋",badge:null},
     {id:"settings",label:"Settings",icon:"⚙️",badge:null},
   ];
 
@@ -1238,15 +1304,154 @@ function AdminPanel({onLogout,onGoClient}){
             ))}
           </div>
           <div style={{padding:"24px 32px"}}>
+            {tab==="overview"&&<AdminOverview/>}
             {tab==="keys"&&<AdminKeys/>}
             {tab==="upgrades"&&<AdminUpgrades onShowDecline={cb=>setShowDecline(cb)}/>}
             {tab==="renewals"&&<AdminRenewals onShowDecline={cb=>setShowDecline(cb)}/>}
             {tab==="makers"&&<AdminMakers/>}
             {tab==="payouts"&&<AdminPayouts/>}
+            {tab==="auditlog"&&<AdminAuditLog/>}
             {tab==="settings"&&<AdminSettings/>}
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Admin: Overview ─────────────────────────────────────────────────────────
+function AdminOverview(){
+  const [upgrades,setUpgrades]=useState([]);
+  const [renewals,setRenewals]=useState([]);
+  const [keys,setKeys]=useState([]);
+  useEffect(()=>{
+    Promise.all([api.getUpgradeRequests(),api.getRenewRequests(),api.getKeys()])
+      .then(([u,r,k])=>{setUpgrades(u||[]);setRenewals(r||[]);setKeys(k||[]);}).catch(()=>{});
+  },[]);
+
+  const allReqs=[...upgrades,...renewals];
+  const today=new Date();
+  const days=Array.from({length:7},(_,i)=>{
+    const d=new Date(today);d.setDate(today.getDate()-6+i);
+    const label=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()];
+    const ymd=d.toISOString().slice(0,10);
+    const count=allReqs.filter(r=>r.createdAt&&r.createdAt.slice(0,10)===ymd).length;
+    return{label,count};
+  });
+  const maxCount=Math.max(...days.map(d=>d.count),1);
+  const statusCounts={pending:allReqs.filter(r=>r.status==="pending").length,approved:allReqs.filter(r=>r.status==="approved").length,declined:allReqs.filter(r=>r.status==="declined").length};
+  const totalStat=statusCounts.pending+statusCounts.approved+statusCounts.declined||1;
+  const pctApproved=Math.round(statusCounts.approved/totalStat*100);
+  const pctDeclined=Math.round(statusCounts.declined/totalStat*100);
+  const pctPending=100-pctApproved-pctDeclined;
+
+  const CHART_H=120,CHART_W=400,BAR_W=36,GAP=(CHART_W-7*BAR_W)/8;
+  return(
+    <div>
+      <h2 style={{margin:"0 0 4px",fontSize:22,fontWeight:900,color:"#F9FAFB"}}>Overview</h2>
+      <p style={{margin:"0 0 24px",fontSize:13,color:"#6B7280"}}>Dashboard analytics</p>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20,marginBottom:24}}>
+        {/* Bar chart */}
+        <div style={{background:"#161B27",border:"1px solid #1E2536",borderRadius:14,padding:20}}>
+          <p style={{margin:"0 0 16px",fontSize:13,fontWeight:700,color:"#E5E7EB"}}>Requests — Last 7 Days</p>
+          <svg width="100%" viewBox={`0 0 ${CHART_W} ${CHART_H+36}`} style={{overflow:"visible"}}>
+            {days.map((d,i)=>{
+              const x=GAP+(BAR_W+GAP)*i;
+              const barH=Math.max(4,Math.round((d.count/maxCount)*CHART_H));
+              const y=CHART_H-barH;
+              return(
+                <g key={i}>
+                  <rect x={x} y={y} width={BAR_W} height={barH} rx={4} fill="#7C3AED" opacity={0.85}/>
+                  {d.count>0&&<text x={x+BAR_W/2} y={y-5} textAnchor="middle" fontSize="10" fill="#A78BFA">{d.count}</text>}
+                  <text x={x+BAR_W/2} y={CHART_H+16} textAnchor="middle" fontSize="10" fill="#6B7280">{d.label}</text>
+                </g>
+              );
+            })}
+            <line x1={0} y1={CHART_H} x2={CHART_W} y2={CHART_H} stroke="#1E2536" strokeWidth={1}/>
+          </svg>
+        </div>
+        {/* Donut */}
+        <div style={{background:"#161B27",border:"1px solid #1E2536",borderRadius:14,padding:20}}>
+          <p style={{margin:"0 0 16px",fontSize:13,fontWeight:700,color:"#E5E7EB"}}>Request Breakdown</p>
+          {(()=>{
+            const r=60,cx=80,cy=80,circ=2*Math.PI*r;
+            const segments=[
+              {label:"Approved",pct:pctApproved,color:"#059669"},
+              {label:"Declined",pct:pctDeclined,color:"#DC2626"},
+              {label:"Pending",pct:pctPending,color:"#D97706"},
+            ];
+            let offset=0;
+            return(
+              <div style={{display:"flex",alignItems:"center",gap:24}}>
+                <svg width={160} height={160}>
+                  <circle cx={cx} cy={cy} r={r} fill="none" stroke="#1E2536" strokeWidth={20}/>
+                  {segments.map((s,i)=>{
+                    const dash=(s.pct/100)*circ;
+                    const el=<circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={s.color} strokeWidth={20}
+                      strokeDasharray={`${dash} ${circ-dash}`} strokeDashoffset={-offset*circ/100}
+                      style={{transform:"rotate(-90deg)",transformOrigin:`${cx}px ${cy}px`}}/>;
+                    offset+=s.pct;return el;
+                  })}
+                  <text x={cx} y={cy-6} textAnchor="middle" fontSize="18" fontWeight="800" fill="#F9FAFB">{totalStat}</text>
+                  <text x={cx} y={cy+12} textAnchor="middle" fontSize="10" fill="#6B7280">total</text>
+                </svg>
+                <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                  {segments.map(s=>(
+                    <div key={s.label} style={{display:"flex",alignItems:"center",gap:8}}>
+                      <div style={{width:10,height:10,borderRadius:2,background:s.color,flexShrink:0}}/>
+                      <span style={{fontSize:12,color:"#9CA3AF"}}>{s.label}</span>
+                      <span style={{fontSize:12,fontWeight:700,color:"#F9FAFB",marginLeft:"auto"}}>{s.label==="Approved"?statusCounts.approved:s.label==="Declined"?statusCounts.declined:statusCounts.pending}</span>
+                    </div>
+                  ))}
+                  <div style={{borderTop:"1px solid #1E2536",paddingTop:8,display:"flex",gap:8}}>
+                    <span style={{fontSize:11,color:"#6B7280"}}>Total Keys:</span>
+                    <span style={{fontSize:11,fontWeight:700,color:"#F9FAFB"}}>{keys.length}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Admin: Audit Log ─────────────────────────────────────────────────────────
+function AdminAuditLog(){
+  const [logs,setLogs]=useState([]);
+  const [loading,setLoading]=useState(true);
+  useEffect(()=>{
+    api.getAuditLogs().then(setLogs).catch(()=>{}).finally(()=>setLoading(false));
+  },[]);
+  const colorFor=(action)=>{
+    if(action.includes("approved"))return{bg:"#064E3B",color:"#6EE7B7",border:"#065F46"};
+    if(action.includes("declined"))return{bg:"#1C0A0A",color:"#FCA5A5",border:"#7F1D1D"};
+    if(action.includes("terminated"))return{bg:"#1C1008",color:"#FCD34D",border:"#78350F"};
+    return{bg:"#0F1117",color:"#9CA3AF",border:"#1E2536"};
+  };
+  return(
+    <div>
+      <h2 style={{margin:"0 0 4px",fontSize:22,fontWeight:900,color:"#F9FAFB"}}>Audit Log</h2>
+      <p style={{margin:"0 0 20px",fontSize:13,color:"#6B7280"}}>Last 200 actions</p>
+      {loading?<Spinner size={20} color="#7C3AED"/>:logs.length===0?(
+        <p style={{color:"#6B7280",textAlign:"center",padding:"40px 0"}}>No audit log entries yet.</p>
+      ):(
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {logs.map(l=>{
+            const c=colorFor(l.action||"");
+            return(
+              <div key={l._id} style={{background:c.bg,border:`1px solid ${c.border}`,borderRadius:10,padding:"10px 14px",display:"flex",gap:12,alignItems:"flex-start",flexWrap:"wrap"}}>
+                <span style={{fontSize:11,color:"#6B7280",fontFamily:"monospace",flexShrink:0,minWidth:140}}>{l.createdAt?new Date(l.createdAt).toLocaleString():""}</span>
+                <span style={{fontSize:12,fontWeight:700,color:c.color,minWidth:160}}>{(l.action||"").replace(/_/g," ").toUpperCase()}</span>
+                <span style={{fontSize:12,color:"#9CA3AF",fontFamily:"monospace"}}>{l.targetKey||""}</span>
+                <span style={{fontSize:12,color:"#6B7280",marginLeft:"auto"}}>{l.actor||""}</span>
+                {l.details&&<span style={{fontSize:11,color:"#6B7280",width:"100%",paddingTop:2}}>{l.details}</span>}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -1260,6 +1465,14 @@ function AdminKeyDetail({keyObj,onBack}){
   const [showTerminate,setShowTerminate]=useState(false);
   const [terminateNote,setTerminateNote]=useState("");
   const [termLoading,setTermLoading]=useState(false);
+  const [adminNote,setAdminNote]=useState(keyObj.adminNote||"");
+  const [noteSaved,setNoteSaved]=useState(false);
+  const [noteSaving,setNoteSaving]=useState(false);
+  const saveNote=async()=>{
+    setNoteSaving(true);
+    try{await api.updateKey(keyObj._id,{adminNote:adminNote.trim()||null});setNoteSaved(true);setTimeout(()=>setNoteSaved(false),2000);}
+    finally{setNoteSaving(false);}
+  };
 
   useEffect(()=>{
     const load=async()=>{
@@ -1403,6 +1616,22 @@ function AdminKeyDetail({keyObj,onBack}){
           <Row label="Address" value={keyObj.address}/>
         </Section>
       </div>
+
+      {/* Admin Note (private — not shown to clients) */}
+      <Section title="Admin Note (private)">
+        <textarea value={adminNote} onChange={e=>setAdminNote(e.target.value)} rows={3}
+          placeholder="Internal note about this key — only visible to admins."
+          style={{width:"100%",background:"#0F1117",border:"1px solid #2D3748",borderRadius:10,
+            padding:"10px 13px",fontSize:13,color:"#F9FAFB",outline:"none",resize:"vertical",
+            boxSizing:"border-box",fontFamily:"inherit",marginBottom:10}}/>
+        <button onClick={saveNote} disabled={noteSaving}
+          style={{padding:"8px 18px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,
+            background:noteSaved?"#064E3B":"#5B21B6",color:noteSaved?"#6EE7B7":"#fff",
+            display:"flex",alignItems:"center",gap:7}}>
+          {noteSaving&&<Spinner size={12} color="white"/>}
+          {noteSaved?"✓ Saved":"Save Note"}
+        </button>
+      </Section>
 
       {/* Upgrade History */}
       <Section title={`Upgrade Requests (${upgradeReqs.length})`}>
@@ -1657,6 +1886,10 @@ function AdminKeys(){
         }} style={{padding:"7px 14px",borderRadius:8,background:"#1E3A5F",color:"#93C5FD",fontSize:12,fontWeight:700,border:"1px solid #1D4ED8",cursor:"pointer"}}>
           ↓ Download {selected.length>0?`Selected (${selected.length})`:"All"}
         </button>
+        <button onClick={()=>downloadCSV("keys")}
+          style={{padding:"7px 14px",borderRadius:8,background:"#1E2536",color:"#A78BFA",fontSize:12,fontWeight:700,border:"1px solid #312E81",cursor:"pointer"}}>
+          ⬇ Export CSV
+        </button>
         {selected.length>0&&(
           <button onClick={deleteSelected}
             style={{padding:"7px 14px",borderRadius:8,background:"#7F1D1D",color:"#FCA5A5",
@@ -1749,9 +1982,34 @@ function AdminUpgrades({onShowDecline}){
   const [selected,setSelected]=useState(null);
   const [tab,setTab]=useState("pending");
   const [search,setSearch]=useState("");
+  const [selectedIds,setSelectedIds]=useState(()=>new Set());
 
   const refresh=()=>api.getUpgradeRequests().then(setRequests).catch(()=>{});
   useEffect(()=>{refresh();},[]);
+  useEffect(()=>{setSelectedIds(new Set());},[tab]);
+
+  const toggleId=(id)=>setSelectedIds(s=>{const n=new Set(s);n.has(id)?n.delete(id):n.add(id);return n;});
+  const clearSel=()=>setSelectedIds(new Set());
+  const bulkDecline=()=>{
+    const ids=[...selectedIds];if(!ids.length)return;
+    onShowDecline&&onShowDecline({onConfirm:async(reason)=>{
+      for(const id of ids){
+        const r=requests.find(x=>x._id===id);if(!r)continue;
+        await api.updateUpgradeRequest(id,{status:"declined",declineReason:reason,processedBy:"admin"});
+        const k=await api.getKey(r.key);if(k)await api.updateKey(k._id,{status:"available"});
+      }
+      clearSel();refresh();
+    }});
+  };
+  const bulkDelete=async()=>{
+    const ids=[...selectedIds];if(!ids.length)return;
+    if(!window.confirm(`Delete ${ids.length} request(s)? This cannot be undone.`))return;
+    await api.bulkDeleteUpgradeRequests(ids);clearSel();refresh();
+  };
+  const deleteOne=async(id)=>{
+    if(!window.confirm("Delete this request? This cannot be undone."))return;
+    await api.deleteUpgradeRequest(id);refresh();
+  };
 
   const filtered=requests.filter(r=>{
     if(r.status!==tab)return false;
@@ -1763,15 +2021,44 @@ function AdminUpgrades({onShowDecline}){
 
   return(
     <div>
-      <div style={{marginBottom:20}}>
-        <h2 style={{margin:"0 0 4px",fontSize:22,fontWeight:900,color:"#F9FAFB"}}>Upgrade Requests</h2>
-        <p style={{margin:0,fontSize:13,color:"#6B7280"}}>{requests.length} total requests</p>
+      <div style={{marginBottom:20,display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+        <div>
+          <h2 style={{margin:"0 0 4px",fontSize:22,fontWeight:900,color:"#F9FAFB"}}>Upgrade Requests</h2>
+          <p style={{margin:0,fontSize:13,color:"#6B7280"}}>{requests.length} total requests</p>
+        </div>
+        {!selected&&(
+          <button onClick={()=>downloadCSV("upgrade-requests")}
+            style={{padding:"8px 14px",borderRadius:8,background:"#1E3A5F",color:"#93C5FD",fontSize:12,fontWeight:700,border:"1px solid #1D4ED8",cursor:"pointer"}}>
+            ⬇ Export CSV
+          </button>
+        )}
       </div>
       {selected?(
         <AdminUpgradeDetail req={selected} onBack={()=>{setSelected(null);refresh();}} onRefresh={refresh} onShowDecline={onShowDecline}/>
       ):(
         <>
           <RequestTabs tab={tab} setTab={setTab} counts={counts}/>
+          {selectedIds.size>0&&(
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,padding:"10px 14px",
+              background:"#161B27",border:"1px solid #5B21B6",borderRadius:10,flexWrap:"wrap"}}>
+              <span style={{fontSize:13,color:"#A78BFA",fontWeight:700}}>{selectedIds.size} selected</span>
+              <div style={{flex:1}}/>
+              {tab==="pending"&&(
+                <button onClick={bulkDecline}
+                  style={{padding:"7px 14px",borderRadius:8,background:"rgba(220,38,38,0.15)",color:"#F87171",fontSize:12,fontWeight:700,border:"1px solid #991B1B",cursor:"pointer"}}>
+                  ✕ Decline Selected
+                </button>
+              )}
+              <button onClick={bulkDelete}
+                style={{padding:"7px 14px",borderRadius:8,background:"#7F1D1D",color:"#FCA5A5",fontSize:12,fontWeight:700,border:"1px solid #991B1B",cursor:"pointer"}}>
+                🗑 Delete Selected
+              </button>
+              <button onClick={clearSel}
+                style={{padding:"7px 14px",borderRadius:8,background:"#1F2937",color:"#9CA3AF",fontSize:12,fontWeight:700,border:"1px solid #374151",cursor:"pointer"}}>
+                Clear
+              </button>
+            </div>
+          )}
           <input placeholder="Search by key, email, username..." value={search} onChange={e=>setSearch(e.target.value)}
             style={{width:"100%",background:"#0F1117",border:"1px solid #2D3748",borderRadius:9,
               padding:"9px 13px",fontSize:13,color:"#F9FAFB",outline:"none",marginBottom:14,boxSizing:"border-box"}}/>
@@ -1786,9 +2073,12 @@ function AdminUpgrades({onShowDecline}){
                   style={{background:"#161B27",border:"1px solid #1E2536",borderRadius:14,
                     padding:"14px 16px",transition:"border-color 0.15s",
                     borderLeft:`4px solid ${accentColor}`}}>
-                  <div style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}}
-                    onClick={()=>setSelected(r)}>
-                    <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    {tab==="pending"&&(
+                      <input type="checkbox" checked={selectedIds.has(r._id)} onChange={()=>toggleId(r._id)}
+                        onClick={e=>e.stopPropagation()} style={{accentColor:"#7C3AED",width:15,height:15,flexShrink:0,cursor:"pointer"}}/>
+                    )}
+                    <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>setSelected(r)}>
                       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
                         <span style={{fontFamily:"monospace",fontSize:12,fontWeight:700,color:"#E5E7EB"}}>{r.key}</span>
                         <Badge status={r.status}/>
@@ -1799,7 +2089,11 @@ function AdminUpgrades({onShowDecline}){
                       </p>
                       {r.declineReason&&<p style={{margin:"3px 0 0",fontSize:11,color:"#F87171"}}>Reason: {r.declineReason}</p>}
                     </div>
-                    <span style={{color:"#6B7280",fontSize:16,fontWeight:700,flexShrink:0}}>→</span>
+                    <span onClick={()=>setSelected(r)} style={{color:"#6B7280",fontSize:16,fontWeight:700,flexShrink:0,cursor:"pointer"}}>→</span>
+                    <button onClick={e=>{e.stopPropagation();deleteOne(r._id);}} title="Delete request"
+                      style={{flexShrink:0,padding:"4px 9px",borderRadius:7,background:"rgba(220,38,38,0.12)",color:"#F87171",fontSize:13,fontWeight:700,border:"1px solid #991B1B",cursor:"pointer"}}>
+                      ✕
+                    </button>
                   </div>
                   {r.status==="pending"&&(
                     <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #1E2536",display:"flex",gap:8}}>
@@ -2053,8 +2347,33 @@ function AdminRenewals({onShowDecline}){
   const [selected,setSelected]=useState(null);
   const [tab,setTab]=useState("pending");
   const [search,setSearch]=useState("");
+  const [selectedIds,setSelectedIds]=useState(()=>new Set());
   const refresh=()=>api.getRenewRequests().then(setRequests).catch(()=>{});
   useEffect(()=>{refresh();},[]);
+  useEffect(()=>{setSelectedIds(new Set());},[tab]);
+
+  const toggleId=(id)=>setSelectedIds(s=>{const n=new Set(s);n.has(id)?n.delete(id):n.add(id);return n;});
+  const clearSel=()=>setSelectedIds(new Set());
+  const bulkDecline=()=>{
+    const ids=[...selectedIds];if(!ids.length)return;
+    onShowDecline&&onShowDecline({onConfirm:async(reason)=>{
+      for(const id of ids){
+        const r=requests.find(x=>x._id===id);if(!r)continue;
+        await api.updateRenewRequest(id,{status:"declined",declineReason:reason,processedBy:"admin"});
+        const k=await api.getKey(r.key);if(k)await api.updateKey(k._id,{status:"used_upgrade"});
+      }
+      clearSel();refresh();
+    }});
+  };
+  const bulkDelete=async()=>{
+    const ids=[...selectedIds];if(!ids.length)return;
+    if(!window.confirm(`Delete ${ids.length} request(s)? This cannot be undone.`))return;
+    await api.bulkDeleteRenewRequests(ids);clearSel();refresh();
+  };
+  const deleteOne=async(id)=>{
+    if(!window.confirm("Delete this request? This cannot be undone."))return;
+    await api.deleteRenewRequest(id);refresh();
+  };
 
   const filtered=requests.filter(r=>{
     if(r.status!==tab)return false;
@@ -2066,15 +2385,44 @@ function AdminRenewals({onShowDecline}){
 
   return(
     <div>
-      <div style={{marginBottom:20}}>
-        <h2 style={{margin:"0 0 4px",fontSize:22,fontWeight:900,color:"#F9FAFB"}}>Renewal Requests</h2>
-        <p style={{margin:0,fontSize:13,color:"#6B7280"}}>{requests.length} total requests</p>
+      <div style={{marginBottom:20,display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+        <div>
+          <h2 style={{margin:"0 0 4px",fontSize:22,fontWeight:900,color:"#F9FAFB"}}>Renewal Requests</h2>
+          <p style={{margin:0,fontSize:13,color:"#6B7280"}}>{requests.length} total requests</p>
+        </div>
+        {!selected&&(
+          <button onClick={()=>downloadCSV("renew-requests")}
+            style={{padding:"8px 14px",borderRadius:8,background:"#1E3A5F",color:"#93C5FD",fontSize:12,fontWeight:700,border:"1px solid #1D4ED8",cursor:"pointer"}}>
+            ⬇ Export CSV
+          </button>
+        )}
       </div>
       {selected?(
         <AdminRenewDetail req={selected} onBack={()=>{setSelected(null);refresh();}} onRefresh={refresh} onShowDecline={onShowDecline}/>
       ):(
         <>
           <RequestTabs tab={tab} setTab={setTab} counts={counts}/>
+          {selectedIds.size>0&&(
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,padding:"10px 14px",
+              background:"#161B27",border:"1px solid #5B21B6",borderRadius:10,flexWrap:"wrap"}}>
+              <span style={{fontSize:13,color:"#A78BFA",fontWeight:700}}>{selectedIds.size} selected</span>
+              <div style={{flex:1}}/>
+              {tab==="pending"&&(
+                <button onClick={bulkDecline}
+                  style={{padding:"7px 14px",borderRadius:8,background:"rgba(220,38,38,0.15)",color:"#F87171",fontSize:12,fontWeight:700,border:"1px solid #991B1B",cursor:"pointer"}}>
+                  ✕ Decline Selected
+                </button>
+              )}
+              <button onClick={bulkDelete}
+                style={{padding:"7px 14px",borderRadius:8,background:"#7F1D1D",color:"#FCA5A5",fontSize:12,fontWeight:700,border:"1px solid #991B1B",cursor:"pointer"}}>
+                🗑 Delete Selected
+              </button>
+              <button onClick={clearSel}
+                style={{padding:"7px 14px",borderRadius:8,background:"#1F2937",color:"#9CA3AF",fontSize:12,fontWeight:700,border:"1px solid #374151",cursor:"pointer"}}>
+                Clear
+              </button>
+            </div>
+          )}
           <input placeholder="Search by key, email, username..." value={search} onChange={e=>setSearch(e.target.value)}
             style={{width:"100%",background:"#0F1117",border:"1px solid #2D3748",borderRadius:9,
               padding:"9px 13px",fontSize:13,color:"#F9FAFB",outline:"none",marginBottom:14,boxSizing:"border-box"}}/>
@@ -2089,9 +2437,12 @@ function AdminRenewals({onShowDecline}){
                   style={{background:"#161B27",border:"1px solid #1E2536",borderRadius:14,
                     padding:"14px 16px",transition:"border-color 0.15s",
                     borderLeft:`4px solid ${accentColor}`}}>
-                  <div style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}}
-                    onClick={()=>setSelected(r)}>
-                    <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    {tab==="pending"&&(
+                      <input type="checkbox" checked={selectedIds.has(r._id)} onChange={()=>toggleId(r._id)}
+                        onClick={e=>e.stopPropagation()} style={{accentColor:"#7C3AED",width:15,height:15,flexShrink:0,cursor:"pointer"}}/>
+                    )}
+                    <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>setSelected(r)}>
                       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
                         <span style={{fontFamily:"monospace",fontSize:12,fontWeight:700,color:"#E5E7EB"}}>{r.key}</span>
                         <Badge status={r.status}/>
@@ -2100,7 +2451,11 @@ function AdminRenewals({onShowDecline}){
                       <p style={{margin:0,fontSize:12,color:"#6B7280"}}>{r.oldEmail} → {r.newEmail} · <span style={{color:"#9CA3AF"}}>{fmtRelTime(r.createdAt)}</span></p>
                       {r.declineReason&&<p style={{margin:"3px 0 0",fontSize:11,color:"#F87171"}}>Reason: {r.declineReason}</p>}
                     </div>
-                    <span style={{color:"#6B7280",fontSize:16,fontWeight:700,flexShrink:0}}>→</span>
+                    <span onClick={()=>setSelected(r)} style={{color:"#6B7280",fontSize:16,fontWeight:700,flexShrink:0,cursor:"pointer"}}>→</span>
+                    <button onClick={e=>{e.stopPropagation();deleteOne(r._id);}} title="Delete request"
+                      style={{flexShrink:0,padding:"4px 9px",borderRadius:7,background:"rgba(220,38,38,0.12)",color:"#F87171",fontSize:13,fontWeight:700,border:"1px solid #991B1B",cursor:"pointer"}}>
+                      ✕
+                    </button>
                   </div>
                   {r.status==="pending"&&(
                     <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid #1E2536",display:"flex",gap:8}}>
@@ -3045,7 +3400,7 @@ function MakerPanel({maker,onLogout}){
               </div>
             </div>
           </div>
-          {[{id:"upgrades",label:"Upgrade Requests",icon:"⚡"},{id:"renewals",label:"Renewal Requests",icon:"🔄"},{id:"earnings",label:"Earnings",icon:"💰"}].map(({id,label,icon})=>(
+          {[{id:"upgrades",label:"Upgrade Requests",icon:"⚡"},{id:"renewals",label:"Renewal Requests",icon:"🔄"},{id:"earnings",label:"Earnings",icon:"💰"},{id:"stats",label:"My Stats",icon:"📊"},{id:"payouthistory",label:"Payout History",icon:"📜"}].map(({id,label,icon})=>(
             <button key={id} onClick={()=>setTab(id)}
               style={{width:"100%",padding:"10px 20px",textAlign:"left",cursor:"pointer",
                 background:tab===id?"rgba(5,150,105,0.2)":"transparent",
@@ -3216,6 +3571,81 @@ function MakerPanel({maker,onLogout}){
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+            </div>
+          )}
+          {tab==="stats"&&(
+            <div>
+              <h2 style={{margin:"0 0 20px",fontSize:22,fontWeight:900,color:DT}}>My Performance</h2>
+              {(()=>{
+                const myU=upgrades.filter(r=>r.processedBy===maker._id);
+                const myR=renewals.filter(r=>r.processedBy===maker._id);
+                const myAll=[...myU,...myR];
+                const approved=myAll.filter(r=>r.status==="approved").length;
+                const declined=myAll.filter(r=>r.status==="declined").length;
+                const total=approved+declined||1;
+                const approvalRate=Math.round(approved/total*100);
+                const avgMs=myAll.filter(r=>r.status==="approved"&&r.createdAt&&r.updatedAt)
+                  .map(r=>new Date(r.updatedAt)-new Date(r.createdAt));
+                const avgTime=avgMs.length?Math.round(avgMs.reduce((a,b)=>a+b,0)/avgMs.length/60000):0;
+                return(
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:14}}>
+                    {[
+                      {label:"Approved",value:approved,color:"#6EE7B7"},
+                      {label:"Declined",value:declined,color:"#F87171"},
+                      {label:"Approval Rate",value:`${approvalRate}%`,color:"#A78BFA"},
+                      {label:"Avg Process Time",value:avgTime?`${avgTime} min`:"—",color:"#FCD34D"},
+                    ].map(({label,value,color})=>(
+                      <div key={label} style={{background:DS,border:`1px solid ${DB}`,borderRadius:14,padding:"20px",textAlign:"center"}}>
+                        <p style={{margin:"0 0 4px",fontSize:26,fontWeight:900,color}}>{value}</p>
+                        <p style={{margin:0,fontSize:12,color:DM}}>{label}</p>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+              {makerData.requestHistory&&makerData.requestHistory.length>0&&(
+                <div style={{marginTop:24}}>
+                  <p style={{fontSize:13,fontWeight:700,color:DT,margin:"0 0 12px"}}>Earnings History</p>
+                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                    {[...makerData.requestHistory].reverse().slice(0,30).map((h,i)=>(
+                      <div key={i} style={{background:DS,border:`1px solid ${DB}`,borderRadius:8,padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <div>
+                          <span style={{fontSize:12,fontWeight:600,color:DT}}>{h.type==="renew"?"🔄 Renewal":"⚡ Upgrade"}</span>
+                          <span style={{fontSize:11,color:DM,marginLeft:10}}>{h.date?new Date(h.date).toLocaleDateString():""}</span>
+                        </div>
+                        <span style={{fontSize:13,fontWeight:700,color:"#6EE7B7"}}>+${(h.amount||0).toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {tab==="payouthistory"&&(
+            <div>
+              <h2 style={{margin:"0 0 20px",fontSize:22,fontWeight:900,color:DT}}>Payout History</h2>
+              {payouts.length===0?(
+                <p style={{color:DM,textAlign:"center",padding:"40px 0"}}>No payouts yet.</p>
+              ):(
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {payouts.map(p=>(
+                    <div key={p._id} style={{background:DS,border:`1px solid ${DB}`,borderRadius:12,padding:"14px 18px"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                        <span style={{fontSize:15,fontWeight:800,color:DT}}>${p.amount.toFixed(2)}</span>
+                        <span style={{fontSize:12,fontWeight:700,padding:"3px 10px",borderRadius:20,
+                          background:p.status==="paid"?"#064E3B":p.status==="rejected"?"#1C0A0A":"#1C1008",
+                          color:p.status==="paid"?"#6EE7B7":p.status==="rejected"?"#FCA5A5":"#FCD34D"}}>
+                          {p.status.toUpperCase()}
+                        </span>
+                      </div>
+                      <p style={{margin:"0 0 2px",fontSize:12,color:DM}}>{p.method.toUpperCase()} → {p.address}</p>
+                      <p style={{margin:0,fontSize:11,color:"#4B5563"}}>{fmtDate(p.createdAt)}</p>
+                      {p.txnId&&<p style={{margin:"4px 0 0",fontSize:11,color:"#6EE7B7",fontFamily:"monospace"}}>TXN: {p.txnId}</p>}
+                      {p.adminNote&&<p style={{margin:"4px 0 0",fontSize:11,color:DM}}>Note: {p.adminNote}</p>}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

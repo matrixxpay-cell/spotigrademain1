@@ -6,7 +6,8 @@ const path       = require("path");
 const fs         = require("fs");
 const multer     = require("multer");
 const nodemailer = require("nodemailer");
-const { Key, UpgradeRequest, RenewRequest, MakerKey, Payout, AppSettings } = require("./models");
+const cron       = require("node-cron");
+const { Key, UpgradeRequest, RenewRequest, MakerKey, Payout, AppSettings, AuditLog } = require("./models");
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -228,6 +229,75 @@ function renewDeclinedEmail({ oldEmail, key, reason }) {
   });
 }
 
+function processingEmail({ email, key }) {
+  return buildEmail({
+    headerBg: "linear-gradient(135deg,#D97706 0%,#92400E 100%)",
+    accentColor: "#D97706", icon: "⏳",
+    heading: "Your Request is Being Processed",
+    body: `<p style="color:#ccc;font-size:15px;line-height:1.7;margin:0 0 20px">
+      Good news — our team has started working on your request. Processing is now underway and typically takes
+      <strong style="color:#1DB954">5–30 minutes</strong>. We'll notify you as soon as it's complete. Thanks for your patience! 🎶
+    </p>`,
+    rows: [
+      ["Spotify Account", email],
+      ["License Key", censorKey(key)],
+    ],
+    ctaHref: "https://spotigrader.cc", ctaLabel: "View Status →", ctaBg: "#D97706", ctaColor: "#fff",
+    key,
+  });
+}
+
+function cooldownReadyEmail({ email, key }) {
+  return buildEmail({
+    headerBg: "linear-gradient(135deg,#1DB954 0%,#158a3e 100%)",
+    accentColor: "#1DB954", icon: "🔓",
+    heading: "Your Key is Ready to Renew!",
+    body: `<p style="color:#ccc;font-size:15px;line-height:1.7;margin:0 0 20px">
+      Great news! The cooldown period on your Spotigrader license key has expired. Your key is now
+      <strong style="color:#1DB954">ready</strong> to be used for another renewal whenever you need it. 🎶
+    </p>`,
+    rows: [
+      email && ["Spotify Account", email],
+      ["License Key", censorKey(key)],
+    ],
+    ctaHref: "https://spotigrader.cc", ctaLabel: "Renew Now →", ctaBg: "#1DB954", ctaColor: "#000",
+    key,
+  });
+}
+
+function digestEmail(stats) {
+  const row = (label, val) => `<tr>
+    <td style="padding:10px 14px;border-bottom:1px solid #1E2536;color:#9CA3AF;font-size:13px">${label}</td>
+    <td style="padding:10px 14px;border-bottom:1px solid #1E2536;color:#F9FAFB;font-size:13px;font-weight:700;text-align:right">${val}</td>
+  </tr>`;
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+  <body style="margin:0;background:#0F1117;font-family:-apple-system,Segoe UI,Roboto,sans-serif;padding:40px 16px">
+    <table align="center" width="100%" style="max-width:520px;background:#161B27;border:1px solid #1E2536;border-radius:16px;overflow:hidden">
+      <tr><td style="background:linear-gradient(135deg,#7C3AED,#4C1D95);padding:28px 32px;text-align:center">
+        <h1 style="margin:0;color:#fff;font-size:20px;font-weight:800">📊 Weekly Digest</h1>
+        <p style="margin:6px 0 0;color:#E9D5FF;font-size:13px">Spotigrader admin report</p>
+      </td></tr>
+      <tr><td style="padding:24px 18px">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          ${row("Total Keys", stats.totalKeys)}
+          ${row("Keys Used This Week", stats.keysUsedThisWeek)}
+          ${row("Upgrade Requests (week)", stats.upgradesWeek)}
+          ${row("&nbsp;&nbsp;· Approved", stats.upApproved)}
+          ${row("&nbsp;&nbsp;· Declined", stats.upDeclined)}
+          ${row("&nbsp;&nbsp;· Pending", stats.upPending)}
+          ${row("Renewal Requests (week)", stats.renewWeek)}
+          ${row("&nbsp;&nbsp;· Approved", stats.reApproved)}
+          ${row("&nbsp;&nbsp;· Declined", stats.reDeclined)}
+          ${row("&nbsp;&nbsp;· Pending", stats.rePending)}
+        </table>
+      </td></tr>
+      <tr><td style="padding:16px 32px;border-top:1px solid #1E2536;text-align:center">
+        <p style="margin:0;color:#6B7280;font-size:12px">© 2026 Spotigrader · <a href="https://spotigrader.cc" style="color:#A78BFA;text-decoration:none">spotigrader.cc</a></p>
+      </td></tr>
+    </table>
+  </body></html>`;
+}
+
 async function sendEmail({ to, subject, html }) {
   try {
     const s = await getSettings();
@@ -238,6 +308,27 @@ async function sendEmail({ to, subject, html }) {
     });
     await transporter.sendMail({ from: s.smtpFrom || s.smtpUser, to, subject, html });
   } catch (e) { console.error("Email error:", e.message); }
+}
+
+async function logAudit({ action, targetId = null, targetKey = null, actor = null, details = null }) {
+  try { await AuditLog.create({ action, targetId, targetKey, actor, details }); }
+  catch (e) { console.error("Audit log error:", e.message); }
+}
+
+async function actorName(processedBy) {
+  if (!processedBy || processedBy === "admin") return "admin";
+  try { const m = await MakerKey.findById(processedBy); return m ? m.name : "admin"; }
+  catch { return "admin"; }
+}
+
+// CSV helper — escapes values and joins rows
+function toCSV(headers, rows) {
+  const esc = (v) => {
+    if (v == null) return "";
+    const s = String(v).replace(/"/g, '""');
+    return /[",\n]/.test(s) ? `"${s}"` : s;
+  };
+  return [headers.join(","), ...rows.map(r => r.map(esc).join(","))].join("\n");
 }
 
 // ── Auth: check key type ──────────────────────────────────────────────────────
@@ -340,16 +431,48 @@ app.patch("/api/upgrade-requests/:id", async (req, res) => {
           subject: "Your Spotigrader Upgrade Request — Update",
           html: upgradeDeclinedEmail({ email: r.email, key: r.key, reason: req.body.declineReason || r.declineReason }),
         });
+      } else if (newStatus === "processing") {
+        await sendEmail({
+          to: r.email,
+          subject: "⏳ Your Upgrade Request is Being Processed",
+          html: processingEmail({ email: r.email, key: r.key }),
+        });
       }
     }
 
+    // Audit log on approve/decline
+    if ((newStatus === "approved" || newStatus === "declined") && newStatus !== prev?.status) {
+      await logAudit({
+        action: `${newStatus}_upgrade`,
+        targetId: String(r._id), targetKey: r.key,
+        actor: await actorName(req.body.processedBy),
+        details: newStatus === "declined" ? (req.body.declineReason || r.declineReason || null) : (r.plan || null),
+      });
+    }
+
     // Credit maker earnings on approval
-    if (newStatus === "approved" && req.body.processedBy && prev?.status !== "approved") {
+    if (newStatus === "approved" && req.body.processedBy && req.body.processedBy !== "admin" && prev?.status !== "approved") {
       const settings = await getSettings();
-      await MakerKey.findByIdAndUpdate(req.body.processedBy, { $inc: { earnings: settings.makerRate } });
+      await MakerKey.findByIdAndUpdate(req.body.processedBy, {
+        $inc: { earnings: settings.makerRate },
+        $push: { requestHistory: { requestId: String(r._id), type: "upgrade", amount: settings.makerRate, date: new Date() } },
+      });
     }
 
     res.json(r);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Single & bulk delete for upgrade requests
+app.delete("/api/upgrade-requests/:id", async (req, res) => {
+  try { await UpgradeRequest.findByIdAndDelete(req.params.id); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.delete("/api/upgrade-requests", async (req, res) => {
+  try {
+    const { ids } = req.body || {};
+    await UpgradeRequest.deleteMany({ _id: { $in: ids || [] } });
+    res.json({ deleted: (ids || []).length });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -402,15 +525,50 @@ app.patch("/api/renew-requests/:id", async (req, res) => {
             html: renewDeclinedEmail({ oldEmail: r.oldEmail, key: r.key, reason: req.body.declineReason || r.declineReason }),
           });
         }
+      } else if (newStatus === "processing") {
+        const to = r.newEmail || r.oldEmail;
+        if (to) {
+          await sendEmail({
+            to,
+            subject: "⏳ Your Upgrade Request is Being Processed",
+            html: processingEmail({ email: to, key: r.key }),
+          });
+        }
       }
     }
 
-    if (newStatus === "approved" && req.body.processedBy && prev?.status !== "approved") {
+    // Audit log on approve/decline
+    if ((newStatus === "approved" || newStatus === "declined") && newStatus !== prev?.status) {
+      await logAudit({
+        action: `${newStatus}_renew`,
+        targetId: String(r._id), targetKey: r.key,
+        actor: await actorName(req.body.processedBy),
+        details: newStatus === "declined" ? (req.body.declineReason || r.declineReason || null) : (r.plan || null),
+      });
+    }
+
+    if (newStatus === "approved" && req.body.processedBy && req.body.processedBy !== "admin" && prev?.status !== "approved") {
       const settings = await getSettings();
-      await MakerKey.findByIdAndUpdate(req.body.processedBy, { $inc: { earnings: settings.makerRate } });
+      await MakerKey.findByIdAndUpdate(req.body.processedBy, {
+        $inc: { earnings: settings.makerRate },
+        $push: { requestHistory: { requestId: String(r._id), type: "renew", amount: settings.makerRate, date: new Date() } },
+      });
     }
 
     res.json(r);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Single & bulk delete for renew requests
+app.delete("/api/renew-requests/:id", async (req, res) => {
+  try { await RenewRequest.findByIdAndDelete(req.params.id); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.delete("/api/renew-requests", async (req, res) => {
+  try {
+    const { ids } = req.body || {};
+    await RenewRequest.deleteMany({ _id: { $in: ids || [] } });
+    res.json({ deleted: (ids || []).length });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -526,6 +684,50 @@ app.get("/api/support-status", async (req, res) => {
   } catch { res.json({ enabled: true, inHours: true, startHour: 0, endHour: 24 }); }
 });
 
+// ════════════════════════════════════════════════════════════════════════════
+//  AUDIT LOG
+// ════════════════════════════════════════════════════════════════════════════
+app.get("/api/audit-logs", async (req, res) => {
+  try { res.json(await AuditLog.find().sort({ createdAt: -1 }).limit(200)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+//  CSV EXPORT
+// ════════════════════════════════════════════════════════════════════════════
+function sendCSV(res, filename, csv) {
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  res.send(csv);
+}
+
+app.get("/api/export/upgrade-requests", async (req, res) => {
+  try {
+    const docs = await UpgradeRequest.find().sort({ createdAt: -1 });
+    const headers = ["Key", "Email", "Country", "Status", "Username", "UpgradeType", "Plan", "Address", "DeclineReason", "ProcessedBy", "CreatedAt"];
+    const rows = docs.map(d => [d.key, d.email, d.country, d.status, d.confirmedUsername, d.upgradeType, d.plan, d.address, d.declineReason, d.processedBy, d.createdAt?.toISOString()]);
+    sendCSV(res, "upgrade-requests.csv", toCSV(headers, rows));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get("/api/export/renew-requests", async (req, res) => {
+  try {
+    const docs = await RenewRequest.find().sort({ createdAt: -1 });
+    const headers = ["Key", "OldEmail", "NewEmail", "Country", "Status", "ProofStatus", "Username", "NewUsername", "DeclineReason", "ProcessedBy", "CreatedAt"];
+    const rows = docs.map(d => [d.key, d.oldEmail, d.newEmail, d.country, d.status, d.proofStatus, d.confirmedUsername, d.newUsername, d.declineReason, d.processedBy, d.createdAt?.toISOString()]);
+    sendCSV(res, "renew-requests.csv", toCSV(headers, rows));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get("/api/export/keys", async (req, res) => {
+  try {
+    const docs = await Key.find().sort({ createdAt: -1 });
+    const headers = ["Key", "Status", "UsedFor", "UsedByEmail", "UsedByUsername", "Country", "Plan", "UpgradeType", "PurchaseDate", "UsedDate", "CooldownUntil", "AdminNote"];
+    const rows = docs.map(d => [d.key, d.status, d.usedFor, d.usedByEmail, d.usedByUsername, d.country, d.plan, d.upgradeType, d.purchaseDate?.toISOString(), d.usedDate?.toISOString(), d.cooldownUntil?.toISOString(), d.adminNote]);
+    sendCSV(res, "keys.csv", toCSV(headers, rows));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── Health / Status ───────────────────────────────────────────────────────────
 app.get("/api/health", (req, res) => res.json({ ok: true }));
 
@@ -565,3 +767,53 @@ app.get("*", (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+// ════════════════════════════════════════════════════════════════════════════
+//  CRON JOBS
+// ════════════════════════════════════════════════════════════════════════════
+
+// Cooldown expiry reminder — runs every hour
+cron.schedule("0 * * * *", async () => {
+  try {
+    const now = new Date();
+    const hourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    const keys = await Key.find({
+      cooldownUntil: { $gte: hourAgo, $lte: now },
+      status: { $in: ["used_upgrade", "used_renew"] },
+      usedByEmail: { $ne: null },
+    });
+    for (const k of keys) {
+      await sendEmail({
+        to: k.usedByEmail,
+        subject: "🔓 Your Spotigrader Key is Ready to Renew!",
+        html: cooldownReadyEmail({ email: k.usedByEmail, key: k.key }),
+      });
+    }
+    if (keys.length) console.log(`Cooldown reminder sent to ${keys.length} key(s).`);
+  } catch (e) { console.error("Cooldown cron error:", e.message); }
+});
+
+// Weekly digest to admin — every Monday 8am UTC
+cron.schedule("0 8 * * 1", async () => {
+  try {
+    const adminEmail = process.env.ADMIN_EMAIL;
+    if (!adminEmail) return;
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const [totalKeys, keysUsedThisWeek, upgrades, renews] = await Promise.all([
+      Key.countDocuments(),
+      Key.countDocuments({ usedDate: { $gte: weekAgo } }),
+      UpgradeRequest.find({ createdAt: { $gte: weekAgo } }),
+      RenewRequest.find({ createdAt: { $gte: weekAgo } }),
+    ]);
+    const count = (arr, s) => arr.filter(r => r.status === s).length;
+    const stats = {
+      totalKeys, keysUsedThisWeek,
+      upgradesWeek: upgrades.length,
+      upApproved: count(upgrades, "approved"), upDeclined: count(upgrades, "declined"), upPending: count(upgrades, "pending"),
+      renewWeek: renews.length,
+      reApproved: count(renews, "approved"), reDeclined: count(renews, "declined"), rePending: count(renews, "pending"),
+    };
+    await sendEmail({ to: adminEmail, subject: "📊 Spotigrader Weekly Digest", html: digestEmail(stats) });
+    console.log("Weekly digest sent to admin.");
+  } catch (e) { console.error("Digest cron error:", e.message); }
+}, { timezone: "UTC" });

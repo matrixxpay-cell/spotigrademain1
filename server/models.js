@@ -55,6 +55,15 @@ const makerKeySchema = new mongoose.Schema({
   name:      { type: String, default: "Maker" },
   status:    { type: String, default: "active" }, // active / suspended
   earnings:  { type: Number, default: 0 },
+  requestHistory: [{ requestId: String, type: String, amount: Number, date: Date }],
+}, { timestamps: true });
+
+const auditLogSchema = new mongoose.Schema({
+  action:    { type: String, required: true }, // e.g. "approved_upgrade", "declined_renew"
+  targetId:  { type: String, default: null },  // request _id
+  targetKey: { type: String, default: null },  // license key
+  actor:     { type: String, default: null },  // "admin" or maker name
+  details:   { type: String, default: null },  // extra info
 }, { timestamps: true });
 
 const payoutSchema = new mongoose.Schema({
@@ -86,5 +95,6 @@ const RenewRequest   = mongoose.model("RenewRequest", renewRequestSchema);
 const MakerKey       = mongoose.model("MakerKey", makerKeySchema);
 const Payout         = mongoose.model("Payout", payoutSchema);
 const AppSettings    = mongoose.model("AppSettings", appSettingsSchema);
+const AuditLog       = mongoose.model("AuditLog", auditLogSchema);
 
-module.exports = { Key, UpgradeRequest, RenewRequest, MakerKey, Payout, AppSettings };
+module.exports = { Key, UpgradeRequest, RenewRequest, MakerKey, Payout, AppSettings, AuditLog };
