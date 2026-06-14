@@ -2799,6 +2799,7 @@ function AdminSettings(){
   const [s,setS]=useState({makerRate:0.09,smtpHost:"",smtpPort:587,smtpUser:"",smtpPass:"",smtpFrom:"",supportEnabled:true,supportStartHour:0,supportEndHour:24});
   const [saved,setSaved]=useState(false);
   const [loading,setLoading]=useState(false);
+  const [smtpTest,setSmtpTest]=useState(null); // null | "testing" | "ok" | "error:msg"
   useEffect(()=>{api.getSettings().then(r=>setS({...s,...r})).catch(()=>{});},[]);
   const save=async()=>{
     setLoading(true);
@@ -2832,6 +2833,23 @@ function AdminSettings(){
               <label style={{fontSize:11,color:"#6B7280",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",display:"block",marginBottom:4}}>SMTP Port</label>
               <input type="number" {...inp("smtpPort")} onChange={e=>setS({...s,smtpPort:parseInt(e.target.value)||587})}/>
             </div>
+            <button onClick={async()=>{
+                setSmtpTest("testing");
+                try{
+                  const r=await fetch("/api/settings/test-smtp",{method:"POST"});
+                  const j=await r.json();
+                  setSmtpTest(r.ok?"ok":"error:"+j.error);
+                }catch(e){setSmtpTest("error:"+e.message);}
+              }}
+              disabled={smtpTest==="testing"}
+              style={{padding:"9px 0",borderRadius:8,border:"none",cursor:"pointer",fontSize:13,fontWeight:700,
+                background:smtpTest==="ok"?"#064E3B":smtpTest&&smtpTest.startsWith("error")?"#7F1D1D":smtpTest==="testing"?"#374151":"#1D4ED8",
+                color:smtpTest==="ok"?"#6EE7B7":smtpTest&&smtpTest.startsWith("error")?"#FCA5A5":"#fff",
+                display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+              {smtpTest==="testing"&&<Spinner size={13} color="white"/>}
+              {smtpTest==="ok"?"✓ Test Email Sent!":smtpTest&&smtpTest.startsWith("error")?"✕ "+smtpTest.slice(6):"Send Test Email"}
+            </button>
+            {smtpTest==="ok"&&<p style={{margin:0,fontSize:11,color:"#6EE7B7"}}>Test email sent to {s.smtpUser}</p>}
           </div>
         </div>
         {/* Support Hours */}

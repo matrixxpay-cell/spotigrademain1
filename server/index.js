@@ -300,6 +300,25 @@ app.patch("/api/settings", async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+app.post("/api/settings/test-smtp", async (req, res) => {
+  try {
+    const s = await getSettings();
+    if (!s.smtpHost || !s.smtpUser) return res.status(400).json({ error: "SMTP not configured." });
+    const transporter = require("nodemailer").createTransport({
+      host: s.smtpHost, port: s.smtpPort, secure: s.smtpPort === 465,
+      auth: { user: s.smtpUser, pass: s.smtpPass },
+    });
+    await transporter.verify();
+    await transporter.sendMail({
+      from: s.smtpFrom || s.smtpUser,
+      to: s.smtpUser,
+      subject: "Spotigrader SMTP Test",
+      html: "<p>✅ Your SMTP configuration is working correctly.</p>",
+    });
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── Public support status (for bot) ──────────────────────────────────────────
 app.get("/api/support-status", async (req, res) => {
   try {
