@@ -451,7 +451,7 @@ function KeyInfoPage({prefillKey="",onRenew}){
   useEffect(()=>{if(prefillKey){setKeyInput(prefillKey);lookup(prefillKey);}},[ prefillKey]);
 
   const clLeft=data?cooldownLeft(data.cooldownUntil):null;
-  const canRenew=data&&data.status==="used_upgrade"&&(!data.cooldownUntil||new Date(data.cooldownUntil)<=new Date());
+  const canRenew=data&&(data.status==="used_upgrade"||data.status==="used_renew")&&(!data.cooldownUntil||new Date(data.cooldownUntil)<=new Date())&&data.status!=="terminated";
 
   return(
     <div style={{maxWidth:680,margin:"0 auto",padding:"32px 16px"}}>
@@ -954,7 +954,8 @@ function RenewPage({onViewStatus,prefillKey=""}){
       const k=await api.getKey(key.trim());
       if(!k){setKeyErr("Key not found.");return;}
       if(k.status==="available"){setKeyErr("This key hasn't been used for an upgrade yet.");return;}
-      if(k.status!=="used_upgrade"){setKeyErr("This key cannot be renewed (not an upgrade key or already renewed).");return;}
+      if(k.status==="terminated"){setKeyErr("This key has been terminated and cannot be renewed.");return;}
+      if(k.status!=="used_upgrade"&&k.status!=="used_renew"){setKeyErr("This key is not eligible for renewal.");return;}
       if(k.cooldownUntil&&new Date(k.cooldownUntil)>new Date()){
         setKeyErr(`Key is on cooldown for ${cooldownLeft(k.cooldownUntil)} more.`);return;
       }
