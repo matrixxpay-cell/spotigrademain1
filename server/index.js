@@ -55,6 +55,110 @@ async function getSettings() {
   return s;
 }
 
+function emailTemplate({ type, status, email, key, plan, upgradeType, reason }) {
+  const isApproved = status === "approved";
+  const isRenew = type === "renew";
+  const actionWord = isRenew ? "Renewal" : "Upgrade";
+  const planLabel = plan ? plan.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()) : null;
+  const typeLabel = upgradeType === "family" ? "Family / Platinum" : upgradeType === "individual" ? "Individual" : null;
+
+  const headerBg   = isApproved ? "linear-gradient(135deg,#1DB954 0%,#158a3e 100%)" : "linear-gradient(135deg,#e53e3e 0%,#9b2c2c 100%)";
+  const accentColor = isApproved ? "#1DB954" : "#e53e3e";
+  const icon        = isApproved ? "✓" : "✕";
+  const headingText = isApproved
+    ? `Your Spotify Premium ${actionWord} is Live!`
+    : `${actionWord} Request — Action Required`;
+
+  const bodyRows = isApproved ? [
+    ["Account", email],
+    planLabel && ["Plan", planLabel],
+    typeLabel && ["Type", typeLabel],
+    ["License Key", key],
+  ].filter(Boolean) : [
+    ["Account", email],
+    ["License Key", key],
+  ];
+
+  const rowsHtml = bodyRows.map(([label, val]) => `
+    <tr>
+      <td style="padding:10px 0;border-bottom:1px solid #2a2a2a;color:#888;font-size:13px;font-family:monospace;width:120px">${label}</td>
+      <td style="padding:10px 0;border-bottom:1px solid #2a2a2a;color:#f0f0f0;font-size:13px;font-family:monospace;word-break:break-all">${val}</td>
+    </tr>`).join("");
+
+  const mainMessage = isApproved
+    ? `<p style="color:#ccc;font-size:15px;line-height:1.7;margin:0 0 20px">
+        Your Spotify account has been successfully ${isRenew ? "renewed" : "upgraded"} to <strong style="color:#1DB954">Premium</strong>.
+        Your account is now active and ready to use. Enjoy your music! 🎶
+      </p>`
+    : `<p style="color:#ccc;font-size:15px;line-height:1.7;margin:0 0 16px">
+        We were unable to process your ${actionWord.toLowerCase()} request at this time.
+        ${reason ? `</p><div style="background:#1a0a0a;border-left:3px solid #e53e3e;padding:14px 16px;border-radius:6px;margin-bottom:16px">
+          <p style="margin:0;color:#fc8181;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Reason for Decline</p>
+          <p style="margin:0;color:#fed7d7;font-size:14px;line-height:1.6">${reason}</p>
+        </div><p style="color:#ccc;font-size:15px;line-height:1.7;margin:0 0 16px">` : ""}
+        If you believe this is a mistake or need assistance, please reach out to our support team.
+      </p>`;
+
+  const ctaButton = isApproved
+    ? `<a href="https://spotigrader.cc" style="display:inline-block;padding:13px 32px;background:#1DB954;color:#000;text-decoration:none;border-radius:50px;font-weight:700;font-size:14px;letter-spacing:0.04em">Open Spotigrader →</a>`
+    : `<a href="https://t.me/spotigradersupportbot" style="display:inline-block;padding:13px 32px;background:#e53e3e;color:#fff;text-decoration:none;border-radius:50px;font-weight:700;font-size:14px;letter-spacing:0.04em">Contact Support →</a>`;
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#0a0a0a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:40px 16px">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px">
+
+        <!-- Logo bar -->
+        <tr><td style="padding-bottom:28px;text-align:center">
+          <span style="font-size:22px;font-weight:900;color:#fff;letter-spacing:-0.5px">🎵 Spotigrader</span>
+        </td></tr>
+
+        <!-- Card -->
+        <tr><td style="background:#141414;border-radius:16px;overflow:hidden;border:1px solid #222">
+
+          <!-- Header -->
+          <div style="background:${headerBg};padding:32px 32px 28px;text-align:center">
+            <div style="width:56px;height:56px;background:rgba(255,255,255,0.2);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;color:#fff;margin-bottom:14px;line-height:56px">${icon}</div>
+            <h1 style="margin:0;color:#fff;font-size:20px;font-weight:800;line-height:1.3">${headingText}</h1>
+          </div>
+
+          <!-- Body -->
+          <div style="padding:28px 32px">
+            ${mainMessage}
+
+            <!-- Details table -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px">
+              ${rowsHtml}
+            </table>
+
+            <!-- CTA -->
+            <div style="text-align:center;margin-bottom:8px">
+              ${ctaButton}
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div style="padding:18px 32px;border-top:1px solid #222;text-align:center">
+            <p style="margin:0;color:#555;font-size:12px;line-height:1.6">
+              This email was sent by <strong style="color:#888">Spotigrader</strong> regarding your license key <span style="font-family:monospace;color:#777">${key}</span>.<br>
+              If you did not submit this request, please contact us immediately.
+            </p>
+          </div>
+        </td></tr>
+
+        <!-- Bottom note -->
+        <tr><td style="padding-top:20px;text-align:center">
+          <p style="margin:0;color:#444;font-size:11px">© 2026 Spotigrader · <a href="https://spotigrader.cc" style="color:${accentColor};text-decoration:none">spotigrader.cc</a></p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+}
+
 async function sendEmail({ to, subject, html }) {
   try {
     const s = await getSettings();
@@ -158,14 +262,22 @@ app.patch("/api/upgrade-requests/:id", async (req, res) => {
       if (newStatus === "approved") {
         await sendEmail({
           to: r.email,
-          subject: "✅ Your Spotify Upgrade is Complete!",
-          html: `<h2>Upgrade Successful!</h2><p>Your Spotify account <b>${r.email}</b> has been upgraded to Premium.</p><p>Key: <code>${r.key}</code></p><p>Thank you for using upgrader.cc!</p>`,
+          subject: "🎵 Your Spotify Premium Upgrade is Live!",
+          html: emailTemplate({
+            type: "upgrade", status: "approved",
+            email: r.email, key: r.key,
+            plan: r.plan, upgradeType: r.upgradeType,
+          }),
         });
       } else if (newStatus === "declined") {
         await sendEmail({
           to: r.email,
-          subject: "❌ Your Spotify Upgrade Request was Declined",
-          html: `<h2>Upgrade Request Declined</h2><p>Your upgrade request for <b>${r.email}</b> was declined.</p>${r.declineReason ? `<p><b>Reason:</b> ${r.declineReason}</p>` : ""}<p>Contact support if you need help.</p>`,
+          subject: "Your Spotigrader Upgrade Request — Update",
+          html: emailTemplate({
+            type: "upgrade", status: "declined",
+            email: r.email, key: r.key,
+            reason: req.body.declineReason || r.declineReason,
+          }),
         });
       }
     }
@@ -205,14 +317,22 @@ app.patch("/api/renew-requests/:id", async (req, res) => {
       if (newStatus === "approved") {
         await sendEmail({
           to: emailTo,
-          subject: "✅ Your Spotify Renewal is Complete!",
-          html: `<h2>Renewal Successful!</h2><p>Your Spotify account has been renewed to Premium.</p><p>Key: <code>${r.key}</code></p><p>Thank you for using upgrader.cc!</p>`,
+          subject: "🎵 Your Spotify Premium Renewal is Live!",
+          html: emailTemplate({
+            type: "renew", status: "approved",
+            email: emailTo, key: r.key,
+            plan: r.plan, upgradeType: r.upgradeType,
+          }),
         });
       } else if (newStatus === "declined") {
         await sendEmail({
           to: emailTo,
-          subject: "❌ Your Spotify Renewal Request was Declined",
-          html: `<h2>Renewal Request Declined</h2><p>Your renewal request was declined.</p>${r.declineReason ? `<p><b>Reason:</b> ${r.declineReason}</p>` : ""}<p>Contact support if you need help.</p>`,
+          subject: "Your Spotigrader Renewal Request — Update",
+          html: emailTemplate({
+            type: "renew", status: "declined",
+            email: emailTo, key: r.key,
+            reason: req.body.declineReason || r.declineReason,
+          }),
         });
       }
     }
