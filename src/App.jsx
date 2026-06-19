@@ -1744,22 +1744,17 @@ function AdminKeys(){
         ?[importKey.trim().toUpperCase()].filter(Boolean)
         :importBulk.split(/[\n,]+/).map(k=>k.trim().toUpperCase()).filter(Boolean);
       if(!keysToImport.length){setImportLoading(false);return;}
-      let added=0,skipped=0;
-      for(const k of keysToImport){
-        const existing=await fetch(`/api/keys/by-key/${k}`).then(r=>r.json()).catch(()=>null);
-        if(existing&&existing._id){skipped++;continue;}
-        const body={key:k,status:importStatus};
-        if(importStatus==="used_upgrade"){
-          body.usedFor="upgrade";
-          if(importEmail.trim())body.usedByEmail=importEmail.trim();
-          if(importUsername.trim())body.usedByUsername=importUsername.trim();
-          body.usedDate=new Date().toISOString();
-        }
-        if(importCooldown){body.cooldownUntil=new Date(importCooldown).toISOString();}
-        await fetch("/api/keys",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).catch(()=>{});
-        added++;
-      }
-      setImportResult({added,skipped});
+      const body={
+        keys:keysToImport,
+        status:importStatus,
+        usedDate:importStatus==="used_upgrade"?new Date().toISOString():null,
+        usedByEmail:importStatus==="used_upgrade"&&importEmail.trim()?importEmail.trim():null,
+        usedByUsername:importStatus==="used_upgrade"&&importUsername.trim()?importUsername.trim():null,
+        cooldownUntil:importCooldown?new Date(importCooldown).toISOString():null,
+      };
+      const res=await fetch("/api/keys/import-bulk",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+      const data=await res.json();
+      setImportResult({added:data.added||0,skipped:data.skipped||0});
       setImportKey("");setImportBulk("");setImportEmail("");setImportUsername("");setImportCooldown("");
       refresh();
     }finally{setImportLoading(false);}

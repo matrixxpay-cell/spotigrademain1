@@ -382,6 +382,7 @@ app.post("/api/keys/generate", async (req, res) => {
 });
 
 // Import a single key with custom fields
+// Import single key
 app.post("/api/keys", async (req, res) => {
   try {
     const { key, status, usedFor, usedByEmail, usedByUsername, usedDate, cooldownUntil, plan, upgradeType, country, address } = req.body;
@@ -391,17 +392,30 @@ app.post("/api/keys", async (req, res) => {
     const doc = await Key.create({
       key: key.trim().toUpperCase(),
       status: status || "available",
-      usedFor: usedFor || null,
-      usedByEmail: usedByEmail || null,
-      usedByUsername: usedByUsername || null,
-      usedDate: usedDate || null,
-      cooldownUntil: cooldownUntil || null,
-      plan: plan || null,
-      upgradeType: upgradeType || null,
-      country: country || null,
-      address: address || null,
+      usedFor: usedFor || null, usedByEmail: usedByEmail || null,
+      usedByUsername: usedByUsername || null, usedDate: usedDate || null,
+      cooldownUntil: cooldownUntil || null, plan: plan || null,
+      upgradeType: upgradeType || null, country: country || null, address: address || null,
     });
     res.json(doc);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Bulk import keys in one shot
+app.post("/api/keys/import-bulk", async (req, res) => {
+  try {
+    const { keys: rawKeys, status, usedByEmail, usedByUsername, usedDate, cooldownUntil } = req.body;
+    if (!Array.isArray(rawKeys) || !rawKeys.length) return res.status(400).json({ error: "keys array required" });
+    const normalized = [...new Set(rawKeys.map(k => k.trim().toUpperCase()).filter(Boolean))];
+    // Find which already exist
+    const existing = await Key.find({ key: { $in: normalized } }).select("key");
+    const existingSet = new Set(existing.map(k => k.key));
+    const toInsert = normalized.filter(k => !existingSet.has(k));
+    const shared = { status: status || "available", usedFor: status === "used_upgrade" ? "upgrade" : null,
+      usedByEmail: usedByEmail || null, usedByUsername: usedByUsername || null,
+      usedDate: usedDate || null, cooldownUntil: cooldownUntil || null };
+    if (toInsert.length) await Key.insertMany(toInsert.map(k => ({ key: k, ...shared })));
+    res.json({ added: toInsert.length, skipped: existingSet.size });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
