@@ -381,6 +381,30 @@ app.post("/api/keys/generate", async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Import a single key with custom fields
+app.post("/api/keys", async (req, res) => {
+  try {
+    const { key, status, usedFor, usedByEmail, usedByUsername, usedDate, cooldownUntil, plan, upgradeType, country, address } = req.body;
+    if (!key) return res.status(400).json({ error: "key is required" });
+    const existing = await Key.findOne({ key: key.trim().toUpperCase() });
+    if (existing) return res.status(409).json({ error: "Key already exists" });
+    const doc = await Key.create({
+      key: key.trim().toUpperCase(),
+      status: status || "available",
+      usedFor: usedFor || null,
+      usedByEmail: usedByEmail || null,
+      usedByUsername: usedByUsername || null,
+      usedDate: usedDate || null,
+      cooldownUntil: cooldownUntil || null,
+      plan: plan || null,
+      upgradeType: upgradeType || null,
+      country: country || null,
+      address: address || null,
+    });
+    res.json(doc);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.patch("/api/keys/:id", async (req, res) => {
   try {
     const k = await Key.findByIdAndUpdate(req.params.id, req.body, { new: true });

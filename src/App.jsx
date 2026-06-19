@@ -1700,8 +1700,19 @@ function AdminKeys(){
   const [genLoading,setGenLoading]=useState(false);
   const [copied,setCopied]=useState(null);
   const [detailKey,setDetailKey]=useState(null);
-  const [genHistory,setGenHistory]=useState(loadGenHistory); // [{date, keys:[]}]
+  const [genHistory,setGenHistory]=useState(loadGenHistory);
   const [historyOpen,setHistoryOpen]=useState(false);
+
+  // Import state
+  const [importMode,setImportMode]=useState("manual"); // "manual" | "bulk"
+  const [importKey,setImportKey]=useState("");
+  const [importBulk,setImportBulk]=useState("");
+  const [importStatus,setImportStatus]=useState("available"); // available | used_upgrade
+  const [importCooldown,setImportCooldown]=useState("");
+  const [importEmail,setImportEmail]=useState("");
+  const [importUsername,setImportUsername]=useState("");
+  const [importLoading,setImportLoading]=useState(false);
+  const [importResult,setImportResult]=useState(null); // {ok, added, skipped}
 
   const refresh=()=>api.getKeys().then(setKeys).catch(()=>{});
   useEffect(()=>{refresh();},[]);
@@ -1719,11 +1730,39 @@ function AdminKeys(){
       const newKeys=after.filter(k=>!beforeIds.has(k._id)).map(k=>k.key);
       if(newKeys.length>0){
         const entry={date:new Date().toISOString(),count:newKeys.length,keys:newKeys};
-        const updated=[entry,...loadGenHistory()].slice(0,50); // keep last 50 batches
+        const updated=[entry,...loadGenHistory()].slice(0,50);
         saveGenHistory(updated);
         setGenHistory(updated);
       }
     }finally{setGenLoading(false);}
+  };
+
+  const doImport=async()=>{
+    setImportLoading(true);setImportResult(null);
+    try{
+      const keysToImport=importMode==="manual"
+        ?[importKey.trim().toUpperCase()].filter(Boolean)
+        :importBulk.split(/[\n,]+/).map(k=>k.trim().toUpperCase()).filter(Boolean);
+      if(!keysToImport.length){setImportLoading(false);return;}
+      let added=0,skipped=0;
+      for(const k of keysToImport){
+        const existing=await fetch(`/api/keys/by-key/${k}`).then(r=>r.json()).catch(()=>null);
+        if(existing&&existing._id){skipped++;continue;}
+        const body={key:k,status:importStatus};
+        if(importStatus==="used_upgrade"){
+          body.usedFor="upgrade";
+          if(importEmail.trim())body.usedByEmail=importEmail.trim();
+          if(importUsername.trim())body.usedByUsername=importUsername.trim();
+          body.usedDate=new Date().toISOString();
+        }
+        if(importCooldown){body.cooldownUntil=new Date(importCooldown).toISOString();}
+        await fetch("/api/keys",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).catch(()=>{});
+        added++;
+      }
+      setImportResult({added,skipped});
+      setImportKey("");setImportBulk("");setImportEmail("");setImportUsername("");setImportCooldown("");
+      refresh();
+    }finally{setImportLoading(false);}
   };
 
   const deleteSelected=async()=>{
@@ -1820,6 +1859,92 @@ function AdminKeys(){
           </div>
         </div>
       )}
+
+      {/* Import Keys */}
+      <div style={{background:"#161B27",border:"1px solid #1E2536",borderRadius:14,padding:20,marginBottom:20}}>
+        <p style={{margin:"0 0 14px",fontSize:13,fontWeight:700,color:"#E5E7EB"}}>Import Existing Keys</p>
+        {/* Mode toggle */}
+        <div style={{display:"flex",gap:8,marginBottom:14}}>
+          {[["manual","Manual (single)"],["bulk","Bulk (paste many)"]].map(([m,lbl])=>(
+            <button key={m} onClick={()=>setImportMode(m)}
+              style={{padding:"7px 16px",borderRadius:8,border:`1.5px solid ${importMode===m?"#7C3AED":"#2D3748"}`,
+                background:importMode===m?"rgba(124,58,237,0.2)":"#0F1117",
+                color:importMode===m?"#A78BFA":"#9CA3AF",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+              {lbl}
+            </button>
+          ))}
+        </div>
+
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {importMode==="manual"?(
+            <div>
+              <label style={{fontSize:11,color:"#6B7280",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",display:"block",marginBottom:4}}>License Key</label>
+              <input placeholder="XXXX-XXXX-XXXX-XXXX" value={importKey} onChange={e=>setImportKey(e.target.value)}
+                style={{width:"100%",background:"#0F1117",border:"1px solid #2D3748",borderRadius:8,padding:"8px 12px",fontSize:13,color:"#F9FAFB",outline:"none",fontFamily:"monospace",boxSizing:"border-box"}}/>
+            </div>
+          ):(
+            <div>
+              <label style={{fontSize:11,color:"#6B7280",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",display:"block",marginBottom:4}}>Paste Keys (one per line or comma-separated)</label>
+              <textarea value={importBulk} onChange={e=>setImportBulk(e.target.value)} rows={5}
+                placeholder={"XXXX-XXXX-XXXX-XXXX\nYYYY-YYYY-YYYY-YYYY\n..."}
+                style={{width:"100%",background:"#0F1117",border:"1px solid #2D3748",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#F9FAFB",outline:"none",fontFamily:"monospace",resize:"vertical",boxSizing:"border-box"}}/>
+            </div>
+          )}
+
+          {/* Status: upgraded or not */}
+          <div>
+            <label style={{fontSize:11,color:"#6B7280",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",display:"block",marginBottom:6}}>Key Status</label>
+            <div style={{display:"flex",gap:8}}>
+              {[["available","Available (not upgraded)"],["used_upgrade","Already Upgraded"]].map(([v,lbl])=>(
+                <button key={v} onClick={()=>setImportStatus(v)}
+                  style={{padding:"8px 14px",borderRadius:8,border:`1.5px solid ${importStatus===v?(v==="available"?"#059669":"#7C3AED"):"#2D3748"}`,
+                    background:importStatus===v?(v==="available"?"rgba(5,150,105,0.15)":"rgba(124,58,237,0.15)"):"#0F1117",
+                    color:importStatus===v?(v==="available"?"#6EE7B7":"#A78BFA"):"#9CA3AF",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                  {lbl}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Extra fields if upgraded */}
+          {importStatus==="used_upgrade"&&(
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div>
+                <label style={{fontSize:11,color:"#6B7280",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",display:"block",marginBottom:4}}>Spotify Email</label>
+                <input placeholder="user@gmail.com" value={importEmail} onChange={e=>setImportEmail(e.target.value)}
+                  style={{width:"100%",background:"#0F1117",border:"1px solid #2D3748",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#F9FAFB",outline:"none",boxSizing:"border-box"}}/>
+              </div>
+              <div>
+                <label style={{fontSize:11,color:"#6B7280",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",display:"block",marginBottom:4}}>Spotify Username</label>
+                <input placeholder="spotify_username" value={importUsername} onChange={e=>setImportUsername(e.target.value)}
+                  style={{width:"100%",background:"#0F1117",border:"1px solid #2D3748",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#F9FAFB",outline:"none",boxSizing:"border-box"}}/>
+              </div>
+            </div>
+          )}
+
+          {/* Cooldown */}
+          <div>
+            <label style={{fontSize:11,color:"#6B7280",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",display:"block",marginBottom:4}}>Cooldown Until (optional)</label>
+            <input type="datetime-local" value={importCooldown} onChange={e=>setImportCooldown(e.target.value)}
+              style={{background:"#0F1117",border:"1px solid #2D3748",borderRadius:8,padding:"8px 12px",fontSize:13,color:"#F9FAFB",outline:"none",colorScheme:"dark"}}/>
+          </div>
+
+          <button onClick={doImport} disabled={importLoading||(importMode==="manual"?!importKey.trim():!importBulk.trim())}
+            style={{padding:"10px 0",borderRadius:8,background:importLoading?"#374151":"#1D4ED8",color:"#fff",fontSize:13,fontWeight:700,border:"none",
+              cursor:importLoading?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            {importLoading&&<Spinner size={13} color="white"/>}
+            Import Keys
+          </button>
+
+          {importResult&&(
+            <div style={{padding:"10px 14px",borderRadius:8,background:importResult.added>0?"#064E3B":"#1C1008",border:`1px solid ${importResult.added>0?"#065F46":"#78350F"}`}}>
+              <p style={{margin:0,fontSize:13,fontWeight:700,color:importResult.added>0?"#6EE7B7":"#FCD34D"}}>
+                ✓ {importResult.added} key{importResult.added!==1?"s":""} imported{importResult.skipped>0?`, ${importResult.skipped} skipped (already exist)`:""}.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Active Keys Stats */}
       {keys.length>0&&(()=>{
